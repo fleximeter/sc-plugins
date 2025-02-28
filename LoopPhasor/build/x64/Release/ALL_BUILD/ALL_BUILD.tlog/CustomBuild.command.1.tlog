@@ -1,0 +1,10 @@
+^D:\SUPERCOLLIDER_BUILD\SUPERCOLLIDER\EXAMPLE-PLUGINS\LOOPPHASOR\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/SuperCollider_Build/supercollider/example-plugins/LoopPhasor -BD:/SuperCollider_Build/supercollider/example-plugins/LoopPhasor/build --check-stamp-file D:/SuperCollider_Build/supercollider/example-plugins/LoopPhasor/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
