@@ -1,3 +1,0 @@
-D:/SuperCollider_Build/supercollider/example-plugins/LoopPhasor/build/CMakeFiles/LoopPhasor.dir
-D:/SuperCollider_Build/supercollider/example-plugins/LoopPhasor/build/CMakeFiles/ALL_BUILD.dir
-D:/SuperCollider_Build/supercollider/example-plugins/LoopPhasor/build/CMakeFiles/ZERO_CHECK.dir

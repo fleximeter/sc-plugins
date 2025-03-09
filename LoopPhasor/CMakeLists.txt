@@ -5,7 +5,7 @@ get_filename_component(PROJECT ${FILENAME} NAME_WE) #automatically sets project 
 message(STATUS "Project name is ${PROJECT}")
 project (${PROJECT})
 
-# this line added
+# Path to local SuperCollider repository
 set(SC_PATH "D:/SuperCollider_Build/supercollider")
 
 include_directories(${SC_PATH}/include/plugin_interface)
