@@ -14,11 +14,11 @@ git clone -b 3.13 --recursive https://github.com/supercollider/supercollider.git
 Install the appropriate build tools. Consult the README files for developing SuperCollider (https://github.com/supercollider/supercollider/blob/develop/README_WINDOWS.md, etc.) You will definitely need to have CMake installed.
 
 ### Step 3
-Follow these instructions from the root of the repository to compile the UGen:
+Follow these instructions from the root of the repository to compile the UGen (replace `path_to_sc_source` with the path to the SuperCollider source code on your computer):
 ```
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=RELEASE -DSUPERNOVA=ON ..
+cmake -DSC_PATH=path_to_sc_source -DCMAKE_BUILD_TYPE=RELEASE -DSUPERNOVA=ON ..
 # if you're on Windows, run the following line
 # cmake --build . --config Release
 # if you're on another platform, run the following line

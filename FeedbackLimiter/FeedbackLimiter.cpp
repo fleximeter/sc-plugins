@@ -28,34 +28,34 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 static InterfaceTable *ft;
 
-// Represents a LoopPhasor UGen.
+// Represents a FeedbackLimiter UGen.
 struct FeedbackLimiter : public Unit {
-    double m_level;             // LoopPhasor output level (position of the phasor between `start` and `end`)
+    double m_level;             // FeedbackLimiter output level (position of the phasor between `start` and `end`)
     float m_prevTriggerStart;   // previous value of trigger to return to start position
     float m_prevTriggerFinish;  // previous value of trigger to finish
     bool m_triggerFinishState;  // current state of finish trigger (true - finish; false - continue looping)
 };
 
-static void LoopPhasor_next_aa(LoopPhasor* unit, int inNumSamples);
-static void LoopPhasor_next_ak(LoopPhasor* unit, int inNumSamples);
-static void LoopPhasor_next_kk(LoopPhasor* unit, int inNumSamples);
-static void LoopPhasor_Ctor(LoopPhasor* unit);
+static void FeedbackLimiter_next_aa(FeedbackLimiter* unit, int inNumSamples);
+static void FeedbackLimiter_next_ak(FeedbackLimiter* unit, int inNumSamples);
+static void FeedbackLimiter_next_kk(FeedbackLimiter* unit, int inNumSamples);
+static void FeedbackLimiter_Ctor(FeedbackLimiter* unit);
 
-// Construct the LoopPhasor
-void LoopPhasor_Ctor(LoopPhasor* unit) {
+// Construct the FeedbackLimiter
+void FeedbackLimiter_Ctor(FeedbackLimiter* unit) {
     // Set the calculation function 
     if (unit->mCalcRate == calc_FullRate) {
         if (INRATE(0) == calc_FullRate) {
             if (INRATE(1) == calc_FullRate) {
-                SETCALC(LoopPhasor_next_aa);
+                SETCALC(FeedbackLimiter_next_aa);
             } else {
-                SETCALC(LoopPhasor_next_ak);
+                SETCALC(FeedbackLimiter_next_ak);
             }
         } else {
-            SETCALC(LoopPhasor_next_kk);
+            SETCALC(FeedbackLimiter_next_kk);
         }
     } else {
-        SETCALC(LoopPhasor_next_ak);
+        SETCALC(FeedbackLimiter_next_ak);
     }
 
     // Initialize the triggers
@@ -68,12 +68,12 @@ void LoopPhasor_Ctor(LoopPhasor* unit) {
     ZOUT0(0) = static_cast<float>(unit->m_level);
 }
 
-// Calculates samples for a LoopPhasor.kr UGen
-void LoopPhasor_next_kk(LoopPhasor* unit, int inNumSamples) {
+// Calculates samples for a FeedbackLimiter.kr UGen
+void FeedbackLimiter_next_kk(FeedbackLimiter* unit, int inNumSamples) {
     // Pointer to output array
     float* out = OUT(0);
 
-    // Get new parameters of the LoopPhasor
+    // Get new parameters of the FeedbackLimiter
     float triggerReturnToStart = IN0(0);
     float triggerFinish = IN0(1);
     double rate = IN0(2);
@@ -82,7 +82,7 @@ void LoopPhasor_next_kk(LoopPhasor* unit, int inNumSamples) {
     double loopStart = IN0(5);
     double loopEnd = IN0(6);
 
-    // Get current state of the LoopPhasor
+    // Get current state of the FeedbackLimiter
     float previousTriggerReturnToStart = unit->m_prevTriggerStart;  // trigger return to start
     float previousTriggerFinish = unit->m_prevTriggerFinish;  // trigger finish
     double level = unit->m_level;
@@ -101,7 +101,7 @@ void LoopPhasor_next_kk(LoopPhasor* unit, int inNumSamples) {
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         // If we haven't triggered completion
         if (!unit->m_triggerFinishState) {
-            // If we're inside the looping part of the LoopPhasor
+            // If we're inside the looping part of the FeedbackLimiter
             if (level >= loopStart && level <= loopEnd) {
                 level = sc_wrap(level, loopStart, loopEnd);
             } else {
@@ -119,18 +119,18 @@ void LoopPhasor_next_kk(LoopPhasor* unit, int inNumSamples) {
         level += rate;
     }
 
-    // Update the state of the LoopPhasor
+    // Update the state of the FeedbackLimiter
     unit->m_prevTriggerStart = triggerReturnToStart;
     unit->m_prevTriggerFinish = triggerFinish;
     unit->m_level = level;
 }
 
-// Calculates samples for a LoopPhasor.ar ugen with .kr parameters
-void LoopPhasor_next_ak(LoopPhasor* unit, int inNumSamples) {
+// Calculates samples for a FeedbackLimiter.ar ugen with .kr parameters
+void FeedbackLimiter_next_ak(FeedbackLimiter* unit, int inNumSamples) {
     // Pointer to output array
     float* out = OUT(0);
 
-    // Get new parameters of the LoopPhasor
+    // Get new parameters of the FeedbackLimiter
     float *triggerReturnToStart = IN(0);
     float *triggerFinish = IN(1);
     double rate = IN0(2);
@@ -139,7 +139,7 @@ void LoopPhasor_next_ak(LoopPhasor* unit, int inNumSamples) {
     double loopStart = IN0(5);
     double loopEnd = IN0(6);
 
-    // Get current state of the LoopPhasor
+    // Get current state of the FeedbackLimiter
     float previousTriggerReturnToStart = unit->m_prevTriggerStart;
     float previousTriggerFinish = unit->m_prevTriggerFinish;
     double level = unit->m_level;
@@ -159,7 +159,7 @@ void LoopPhasor_next_ak(LoopPhasor* unit, int inNumSamples) {
 
         // Wrapping: if we haven't triggered completion
         if (!unit->m_triggerFinishState) {
-            // if we're inside the looping part of the LoopPhasor
+            // if we're inside the looping part of the FeedbackLimiter
             if (level >= loopStart && level <= loopEnd) {
                 level = sc_wrap(level, loopStart, loopEnd);
             } else {
@@ -179,17 +179,17 @@ void LoopPhasor_next_ak(LoopPhasor* unit, int inNumSamples) {
         previousTriggerFinish = triggerFinish[xxn];
     }
 
-    // update the state of the LoopPhasor
+    // update the state of the FeedbackLimiter
     unit->m_prevTriggerStart = previousTriggerReturnToStart;
     unit->m_prevTriggerFinish = previousTriggerFinish;
     unit->m_level = level;
 }
 
-// Calculates samples for a LoopPhasor.ar UGen with .ar parameters
-void LoopPhasor_next_aa(LoopPhasor* unit, int inNumSamples) {
+// Calculates samples for a FeedbackLimiter.ar UGen with .ar parameters
+void FeedbackLimiter_next_aa(FeedbackLimiter* unit, int inNumSamples) {
     float* out = OUT(0);
 
-    // Get new parameters of the LoopPhasor
+    // Get new parameters of the FeedbackLimiter
     float *triggerReturnToStart = IN(0);
     float *triggerFinish = IN(1);
     float *rate = IN(2);
@@ -198,7 +198,7 @@ void LoopPhasor_next_aa(LoopPhasor* unit, int inNumSamples) {
     double loopStart = IN0(5);
     double loopEnd = IN0(6);
 
-    // Get current state of the LoopPhasor
+    // Get current state of the FeedbackLimiter
     float previousTriggerReturnToStart = unit->m_prevTriggerStart;
     float previousTriggerFinish = unit->m_prevTriggerFinish;
     double level = unit->m_level;
@@ -221,7 +221,7 @@ void LoopPhasor_next_aa(LoopPhasor* unit, int inNumSamples) {
 
         // Wrapping: if we haven't triggered completion
         if (!unit->m_triggerFinishState) {
-            // If we're inside the looping part of the LoopPhasor
+            // If we're inside the looping part of the FeedbackLimiter
             if (level >= loopStart && level <= loopEnd) {
                 level = sc_wrap(level, loopStart, loopEnd);
             } else {
@@ -241,13 +241,13 @@ void LoopPhasor_next_aa(LoopPhasor* unit, int inNumSamples) {
         previousTriggerFinish = triggerFinish[xxn];
     }
     
-    // update the state of the LoopPhasor at the end of the calculation block
+    // update the state of the FeedbackLimiter at the end of the calculation block
     unit->m_prevTriggerStart = previousTriggerReturnToStart;
     unit->m_prevTriggerFinish = previousTriggerFinish;
     unit->m_level = level;
 }
 
-PluginLoad(LoopPhasor) {
+PluginLoad(FeedbackLimiter) {
     ft = inTable;
-    DefineSimpleUnit(LoopPhasor);
+    DefineSimpleUnit(FeedbackLimiter);
 }

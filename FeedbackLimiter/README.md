@@ -1,4 +1,4 @@
-# FeedbackLimiter
+# FeedbackLimiter (UNFINISHED)
 
 This is a UGen plugin for the SuperCollider audio server. It is used to control a feedback coefficient to prevent feedback from blowing up.
 
