@@ -24,12 +24,12 @@
 // ImpulseDropout is a version of Impulse that randomly drops a percentage of the impulses.
 ImpulseDropout : UGen {
     *ar {
-        arg freq = 440.0, dropFrac = 0.0, phase = 0.0, mul = 1.0, add = 0.0;
-        ^this.multiNew('audio', freq, dropFrac, phase).madd(mul, add);
+        arg freq = 440.0, phase = 0.0, dropFrac = 0.0, mul = 1.0, add = 0.0;
+        ^this.multiNew('audio', freq, phase, dropFrac).madd(mul, add);
     }
     *kr {
-        arg freq = 440.0, dropFrac = 0.0, phase = 0.0, mul = 1.0, add = 0.0;
-        ^this.multiNew('control', freq, dropFrac, phase).madd(mul, add);
+        arg freq = 440.0, phase = 0.0, dropFrac = 0.0, mul = 1.0, add = 0.0;
+        ^this.multiNew('control', freq, phase, dropFrac).madd(mul, add);
     }
     signalRange { ^\unipolar }
 }
