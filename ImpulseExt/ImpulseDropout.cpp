@@ -58,23 +58,23 @@ struct ImpulseDropout : public Unit {
     float mFreqMul;
 };
 
-// void ImpulseDropout_Ctor(ImpulseDropout* unit);
-// void ImpulseDropout_next_aa(ImpulseDropout* unit, int inNumSamples);
-// void ImpulseDropout_next_ai(ImpulseDropout* unit, int inNumSamples);
-// void ImpulseDropout_next_ak(ImpulseDropout* unit, int inNumSamples);
-// void ImpulseDropout_next_ki(ImpulseDropout* unit, int inNumSamples);
-// void ImpulseDropout_next_kk(ImpulseDropout* unit, int inNumSamples);
+void ImpulseDropout_Ctor(ImpulseDropout* unit);
+void ImpulseDropout_next_aa(ImpulseDropout* unit, int inNumSamples);
+void ImpulseDropout_next_ai(ImpulseDropout* unit, int inNumSamples);
+void ImpulseDropout_next_ak(ImpulseDropout* unit, int inNumSamples);
+void ImpulseDropout_next_ki(ImpulseDropout* unit, int inNumSamples);
+void ImpulseDropout_next_kk(ImpulseDropout* unit, int inNumSamples);
 
 void ImpulseDropout_next_aa(ImpulseDropout* unit, int inNumSamples) {
     float* out = OUT(0);
-    float* freqin = IN(0);
+    float* freqIn = IN(0);
     float* offIn = IN(1);
     float dropProbIn = IN0(2);
     
     // Collect UGen state
     double phase = unit->mPhase;
     double inc = unit->mPhaseIncrement;
-    float freqmul = unit->mFreqMul;
+    float freqMul = unit->mFreqMul;
     double prevOff = unit->mPhaseOffset;
     
     RGET
@@ -88,7 +88,7 @@ void ImpulseDropout_next_aa(ImpulseDropout* unit, int inNumSamples) {
         double offInc = off - prevOff;
         phase += offInc;
         testWrapPhase(inc, phase);
-        inc = freqin[xxn] * freqmul;
+        inc = freqIn[xxn] * freqMul;
         out[xxn] = impulseResult;
         phase += inc;
         prevOff = off;
@@ -101,13 +101,13 @@ void ImpulseDropout_next_aa(ImpulseDropout* unit, int inNumSamples) {
 
 void ImpulseDropout_next_ai(ImpulseDropout* unit, int inNumSamples) {
     float* out = OUT(0);
-    float freqin = IN0(0);
+    float freqIn = IN0(0);
     float dropProbIn = IN0(2);
 
     // Collect UGen state
     double phase = unit->mPhase;
     double inc = unit->mPhaseIncrement;
-    float freqmul = unit->mFreqMul;
+    float freqMul = unit->mFreqMul;
 
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
@@ -116,7 +116,7 @@ void ImpulseDropout_next_ai(ImpulseDropout* unit, int inNumSamples) {
         if (impulseResult > 0.5f && rgen.frand() < dropProbIn) {
             impulseResult = 0.f;
         }
-        inc = freqin * freqmul;
+        inc = freqIn * freqMul;
         out[xxn] = impulseResult;
         phase += inc;
     }
