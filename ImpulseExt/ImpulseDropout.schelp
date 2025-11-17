@@ -1,0 +1,64 @@
+class:: ImpulseDropout
+summary:: Modified Impulse with dropout
+related:: Classes/Impulse, Classes/Dust
+categories::  UGens>Generators>Stochastic
+
+
+Description::
+
+ImpulseDropout is a modified version of Impulse that randomly drops a percentage of impulses,
+controlled by the dropFrac argument. For example, if dropFrac = 0.2, 0.2 of the impulses
+will be zeroed out per audio block. The impulses that are zeroed out are chosen randomly.
+
+classmethods::
+
+method::ar, kr
+
+argument::freq
+Frequency in Hertz. freq may be negative.
+
+argument::dropFrac
+The percentage of impulses that will be randomly dropped (between 0.0 and 1.0).
+
+argument::phase
+Phase offset in cycles (0..1). Staying in this range offers a slight efficiency advantage, though phase offsets outside this range are supported and wrapped internally.
+
+argument::mul
+The output will be multiplied by this value.
+
+argument::add
+This value will be added to the output.
+
+Examples::
+
+code::
+(
+p = Platform.resourceDir +/+ "sounds/a11wlk01.wav";
+b = Buffer.read(s, p);
+x = Bus.audio(s, 1);
+
+SynthDef(\ptr, {
+	var sig;
+	sig = LoopPhasor.ar(\t_start.tr(0.0), \t_end.tr(0.0), \rate.kr(1.0) * BufRateScale.ir(b), 0.0, BufFrames.kr(b), \loopStart.ir(0), \loopEnd.ir(1));
+	Out.ar(\out.kr(0), sig);
+}).add;
+
+SynthDef(\player, {
+	var sig, ptr_in;
+	ptr_in = In.ar(\ptr.kr(0));
+	sig = BufRd.ar(1, b, ptr_in, 0);
+	Out.ar(0, sig);
+}).add;
+
+// we need two synths: a pointer synth and a player synth
+y = Synth(\ptr, [\out, x, \loopStart, 80e3, \loopEnd, 120e3]);
+z = Synth(\player, [\ptr, x], addAction: \addToTail);
+
+// to stop looping and end naturally
+y.set(\t_end, 1.0);
+
+// free the synths
+z.free;
+y.free;
+)
+::
