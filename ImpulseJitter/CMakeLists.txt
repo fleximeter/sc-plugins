@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-set(FILENAME "ImpulseDust.cpp") #specify the .cpp file here
+set(FILENAME "ImpulseJitter.cpp") #specify the .cpp file here
 # set(SC_PATH "D:/SuperCollider_Build/supercollider")
 cmake_minimum_required (VERSION 3.5)
 get_filename_component(PROJECT ${FILENAME} NAME_WE) #automatically sets project name from the filename

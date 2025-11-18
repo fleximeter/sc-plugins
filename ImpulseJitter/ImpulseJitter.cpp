@@ -1,9 +1,9 @@
 /*
-File: ImpulseDropout.cpp
+File: ImpulseJitter.cpp
 Author: Jeff Martin
 
 Description:
-This file contains the ImpulseDropout UGen implementation.
+This file contains the ImpulseJitter UGen implementation.
 
 Copyright © 2025 by Jeffrey Martin. All rights reserved.
 Website: https://www.jeffreymartincomposer.com
@@ -52,24 +52,24 @@ static inline float testWrapPhase(double prev_inc, double& phase) {
     }
 }
 
-// Represents an ImpulseDropout UGen.
-struct ImpulseDropout : public Unit {
+// Represents an ImpulseJitter UGen.
+struct ImpulseJitter : public Unit {
     double mPhase, mPhaseOffset, mPhaseIncrement;
     float mFreqMul;
 };
 
-void ImpulseDropout_Ctor(ImpulseDropout* unit);
-void ImpulseDropout_next_aa(ImpulseDropout* unit, int inNumSamples);
-void ImpulseDropout_next_ai(ImpulseDropout* unit, int inNumSamples);
-void ImpulseDropout_next_ak(ImpulseDropout* unit, int inNumSamples);
-void ImpulseDropout_next_ki(ImpulseDropout* unit, int inNumSamples);
-void ImpulseDropout_next_kk(ImpulseDropout* unit, int inNumSamples);
+void ImpulseJitter_Ctor(ImpulseJitter* unit);
+void ImpulseJitter_next_aa(ImpulseJitter* unit, int inNumSamples);
+void ImpulseJitter_next_ai(ImpulseJitter* unit, int inNumSamples);
+void ImpulseJitter_next_ak(ImpulseJitter* unit, int inNumSamples);
+void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples);
+void ImpulseJitter_next_kk(ImpulseJitter* unit, int inNumSamples);
 
-void ImpulseDropout_next_aa(ImpulseDropout* unit, int inNumSamples) {
+void ImpulseJitter_next_aa(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
     float* freqIn = IN(0);
     float* offIn = IN(1);
-    float dropProbIn = IN0(2);
+    float jitterFracIn = IN0(2);
     
     // Collect UGen state
     double phase = unit->mPhase;
@@ -77,19 +77,33 @@ void ImpulseDropout_next_aa(ImpulseDropout* unit, int inNumSamples) {
     float freqMul = unit->mFreqMul;
     double prevOff = unit->mPhaseOffset;
     
+    size_t jitterWidth = static_cast<size_t>(jitterFracIn * inNumSamples);
+
+    // Zero out the output buffer
+    for (int xxn = 0; xxn < inNumSamples; xxn++) {
+        out[xxn] = 0.f;
+    }
+
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(inc, phase);
-        // Drop the impulse if necessary
-        if (impulseResult > 0.5f && rgen.frand() < dropProbIn) {
-            impulseResult = 0.f;
+        if (impulseResult > 0.5f) {
+            size_t randLow = xxn - jitterWidth;
+            size_t randHigh = xxn + jitterWidth;
+            if (randLow < 0) {
+                randLow = 0;
+            }
+            if (randHigh >= inNumSamples) {
+                randHigh = inNumSamples - 1;
+            }
+            size_t idx = rgen.irand(randHigh - randLow) + randLow;
+            out[idx] = 1.f;
         }
         double off = static_cast<double>(offIn[xxn]);
         double offInc = off - prevOff;
         phase += offInc;
         testWrapPhase(inc, phase);
         inc = freqIn[xxn] * freqMul;
-        out[xxn] = impulseResult;
         phase += inc;
         prevOff = off;
     }
@@ -99,25 +113,39 @@ void ImpulseDropout_next_aa(ImpulseDropout* unit, int inNumSamples) {
     unit->mPhaseIncrement = inc;
 }
 
-void ImpulseDropout_next_ai(ImpulseDropout* unit, int inNumSamples) {
+void ImpulseJitter_next_ai(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
     float freqIn = IN0(0);
-    float dropProbIn = IN0(2);
+    float jitterFracIn = IN0(2);
 
     // Collect UGen state
     double phase = unit->mPhase;
     double inc = unit->mPhaseIncrement;
     float freqMul = unit->mFreqMul;
 
+    size_t jitterWidth = static_cast<size_t>(jitterFracIn * inNumSamples);
+
+    // Zero out the output buffer
+    for (int xxn = 0; xxn < inNumSamples; xxn++) {
+        out[xxn] = 0.f;
+    }
+
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(inc, phase);
-        // Drop the impulse if necessary
-        if (impulseResult > 0.5f && rgen.frand() < dropProbIn) {
-            impulseResult = 0.f;
+        if (impulseResult > 0.5f) {
+            size_t randLow = xxn - jitterWidth;
+            size_t randHigh = xxn + jitterWidth;
+            if (randLow < 0) {
+                randLow = 0;
+            }
+            if (randHigh >= inNumSamples) {
+                randHigh = inNumSamples - 1;
+            }
+            size_t idx = rgen.irand(randHigh - randLow) + randLow;
+            out[idx] = 1.f;
         }
         inc = freqIn * freqMul;
-        out[xxn] = impulseResult;
         phase += inc;
     }
 
@@ -125,11 +153,11 @@ void ImpulseDropout_next_ai(ImpulseDropout* unit, int inNumSamples) {
     unit->mPhaseIncrement = inc;
 }
 
-void ImpulseDropout_next_ak(ImpulseDropout* unit, int inNumSamples) {
+void ImpulseJitter_next_ak(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
     float freqIn = IN0(0);
     double off = IN0(1);
-    float dropProbIn = IN0(2);
+    float jitterFracIn = IN0(2);
     
     // Collect UGen state
     double phase = unit->mPhase;
@@ -140,19 +168,33 @@ void ImpulseDropout_next_ak(ImpulseDropout* unit, int inNumSamples) {
     double offSlope = CALCSLOPE(off, prevOff);
     bool offChanged = offSlope != 0.f;
 
+    size_t jitterWidth = static_cast<size_t>(jitterFracIn * inNumSamples);
+    
+    // Zero out the output buffer
+    for (int xxn = 0; xxn < inNumSamples; xxn++) {
+        out[xxn] = 0.f;
+    }
+
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(inc, phase);
-        // Drop the impulse if necessary
-        if (impulseResult > 0.5f && rgen.frand() < dropProbIn) {
-            impulseResult = 0.f;
+        if (impulseResult > 0.5f) {
+            size_t randLow = xxn - jitterWidth;
+            size_t randHigh = xxn + jitterWidth;
+            if (randLow < 0) {
+                randLow = 0;
+            }
+            if (randHigh >= inNumSamples) {
+                randHigh = inNumSamples - 1;
+            }
+            size_t idx = rgen.irand(randHigh - randLow) + randLow;
+            out[idx] = 1.f;
         }
         if (offChanged) {
             phase += offSlope;
             testWrapPhase(inc, phase);
         }
         inc = freqIn * freqMul;
-        out[xxn] = impulseResult;
         phase += inc;
     }
 
@@ -161,10 +203,10 @@ void ImpulseDropout_next_ak(ImpulseDropout* unit, int inNumSamples) {
     unit->mPhaseIncrement = inc;
 }
 
-void ImpulseDropout_next_ki(ImpulseDropout* unit, int inNumSamples) {
+void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
     double inc = IN0(0) * unit->mFreqMul;
-    float dropProbIn = IN0(2);
+    float jitterFracIn = IN0(2);
 
     // Collect UGen state
     double phase = unit->mPhase;
@@ -172,14 +214,28 @@ void ImpulseDropout_next_ki(ImpulseDropout* unit, int inNumSamples) {
     
     double incSlope = CALCSLOPE(inc, prevInc);
     
+    size_t jitterWidth = static_cast<size_t>(jitterFracIn * inNumSamples);
+
+    // Zero out the output buffer
+    for (int xxn = 0; xxn < inNumSamples; xxn++) {
+        out[xxn] = 0.f;
+    }
+
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(prevInc, phase);
-        // Drop the impulse if necessary
-        if (impulseResult > 0.5f && rgen.frand() < dropProbIn) {
-            impulseResult = 0.f;
+        if (impulseResult > 0.5f) {
+            size_t randLow = xxn - jitterWidth;
+            size_t randHigh = xxn + jitterWidth;
+            if (randLow < 0) {
+                randLow = 0;
+            }
+            if (randHigh >= inNumSamples) {
+                randHigh = inNumSamples - 1;
+            }
+            size_t idx = rgen.irand(randHigh - randLow) + randLow;
+            out[idx] = 1.f;
         }
-        out[xxn] = impulseResult;
         prevInc += incSlope;
         phase += prevInc;
     }
@@ -188,11 +244,11 @@ void ImpulseDropout_next_ki(ImpulseDropout* unit, int inNumSamples) {
     unit->mPhaseIncrement = inc;
 }
 
-void ImpulseDropout_next_kk(ImpulseDropout* unit, int inNumSamples) {
+void ImpulseJitter_next_kk(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
     double inc = IN0(0) * unit->mFreqMul;
     double off = IN0(1);
-    float dropProbIn = IN0(2);
+    float jitterFracIn = IN0(2);
 
     // Collect UGen state
     double phase = unit->mPhase;
@@ -203,18 +259,32 @@ void ImpulseDropout_next_kk(ImpulseDropout* unit, int inNumSamples) {
     double phaseSlope = CALCSLOPE(off, prevOff);
     bool phOffChanged = phaseSlope != 0.f;
 
+    size_t jitterWidth = static_cast<size_t>(jitterFracIn * inNumSamples);
+
+    // Zero out the output buffer
+    for (int xxn = 0; xxn < inNumSamples; xxn++) {
+        out[xxn] = 0.f;
+    }
+
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(prevInc, phase);
-        // Drop the impulse if necessary
-        if (impulseResult > 0.5f && rgen.frand() < dropProbIn) {
-            impulseResult = 0.f;
+        if (impulseResult > 0.5f) {
+            size_t randLow = xxn - jitterWidth;
+            size_t randHigh = xxn + jitterWidth;
+            if (randLow < 0) {
+                randLow = 0;
+            }
+            if (randHigh >= inNumSamples) {
+                randHigh = inNumSamples - 1;
+            }
+            size_t idx = rgen.irand(randHigh - randLow) + randLow;
+            out[idx] = 1.f;
         }
         if (phOffChanged) {
             phase += phaseSlope;
             testWrapPhase(prevInc, phase);
         }
-        out[xxn] = impulseResult;
         prevInc += incSlope;
         phase += prevInc;
     }
@@ -224,8 +294,8 @@ void ImpulseDropout_next_kk(ImpulseDropout* unit, int inNumSamples) {
     unit->mPhaseIncrement = inc;
 }
 
-// Construct the ImpulseDropout
-void ImpulseDropout_Ctor(ImpulseDropout* unit) {
+// Construct the ImpulseJitter
+void ImpulseJitter_Ctor(ImpulseJitter* unit) {
     unit->mPhaseIncrement = IN0(0) * unit->mFreqMul;
     unit->mPhaseOffset = IN0(1);
     unit->mFreqMul = static_cast<float>(unit->mRate->mSampleDur);
@@ -246,28 +316,28 @@ void ImpulseDropout_Ctor(ImpulseDropout* unit) {
     case calc_FullRate:
         switch (INRATE(1)) {
         case calc_ScalarRate:
-            func = (UnitCalcFunc)ImpulseDropout_next_ai;
+            func = (UnitCalcFunc)ImpulseJitter_next_ai;
             break;
         case calc_BufRate:
-            func = (UnitCalcFunc)ImpulseDropout_next_ak;
+            func = (UnitCalcFunc)ImpulseJitter_next_ak;
             break;
         case calc_FullRate:
-            func = (UnitCalcFunc)ImpulseDropout_next_aa;
+            func = (UnitCalcFunc)ImpulseJitter_next_aa;
             break;
         }
         break;
     case calc_BufRate:
         if (INRATE(1) == calc_ScalarRate) {
-            func = (UnitCalcFunc)ImpulseDropout_next_ki;
+            func = (UnitCalcFunc)ImpulseJitter_next_ki;
         } else {
-            func = (UnitCalcFunc)ImpulseDropout_next_kk;
+            func = (UnitCalcFunc)ImpulseJitter_next_kk;
         }
         break;
     case calc_ScalarRate:
         if (INRATE(1) == calc_ScalarRate) {
-            func = (UnitCalcFunc)ImpulseDropout_next_ki;
+            func = (UnitCalcFunc)ImpulseJitter_next_ki;
         } else {
-            func = (UnitCalcFunc)ImpulseDropout_next_kk;
+            func = (UnitCalcFunc)ImpulseJitter_next_kk;
         }
         break;
     }
@@ -279,7 +349,7 @@ void ImpulseDropout_Ctor(ImpulseDropout* unit) {
     unit->mPhaseIncrement = initInc;
 }
 
-PluginLoad(ImpulseDropout) {
+PluginLoad(ImpulseJitter) {
     ft = inTable;
-    DefineSimpleUnit(ImpulseDropout);
+    DefineSimpleUnit(ImpulseJitter);
 }

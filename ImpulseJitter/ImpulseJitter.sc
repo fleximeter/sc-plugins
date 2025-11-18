@@ -1,9 +1,9 @@
-// File: ImpulseDust.sc
+// File: ImpulseJitter.sc
 // Author: Jeff Martin
 //
 // Description:
 // This is a SuperColllider UGen based on the Impulse class.
-// It allows morphing between the perfect regularity of Impulse and the irregularity of Dust.
+// It allows adding a stochastic element to the impulse position.
 //
 // Copyright © 2025 by Jeffrey Martin. All rights reserved.
 // Website: https://www.jeffreymartincomposer.com
@@ -21,15 +21,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// ImpulseDust is a version of Impulse that allows morphing to the irregularity of Dust.
-ImpulseDust : UGen {
+// ImpulseJitter is a version of Impulse that allows the addition of jitter to each impulse.
+ImpulseJitter : UGen {
     *ar {
-        arg freq = 440.0, dustFrac = 0.0, phase = 0.0, mul = 1.0, add = 0.0;
-        ^this.multiNew('audio', freq, dustFrac, phase).madd(mul, add);
+        arg freq = 440.0, phase = 0.0, jitterFrac = 0.0, mul = 1.0, add = 0.0;
+        ^this.multiNew('audio', freq, phase, jitterFrac).madd(mul, add);
     }
     *kr {
-        arg freq = 440.0, dustFrac = 0.0, phase = 0.0, mul = 1.0, add = 0.0;
-        ^this.multiNew('control', freq, dustFrac, phase).madd(mul, add);
+        arg freq = 440.0, phase = 0.0, jitterFrac = 0.0, mul = 1.0, add = 0.0;
+        ^this.multiNew('control', freq, phase, jitterFrac).madd(mul, add);
     }
     signalRange { ^\unipolar }
 }
