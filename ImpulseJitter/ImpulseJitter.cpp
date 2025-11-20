@@ -77,7 +77,7 @@ void ImpulseJitter_next_aa(ImpulseJitter* unit, int inNumSamples) {
     float freqMul = unit->mFreqMul;
     double prevOff = unit->mPhaseOffset;
     
-    size_t jitterWidth = static_cast<size_t>(jitterFracIn * inNumSamples);
+    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
 
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
@@ -88,15 +88,15 @@ void ImpulseJitter_next_aa(ImpulseJitter* unit, int inNumSamples) {
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(inc, phase);
         if (impulseResult > 0.5f) {
-            size_t randLow = xxn - jitterWidth;
-            size_t randHigh = xxn + jitterWidth;
+            int randLow = xxn - jitterWidth;
+            int randHigh = xxn + jitterWidth;
             if (randLow < 0) {
                 randLow = 0;
             }
             if (randHigh >= inNumSamples) {
                 randHigh = inNumSamples - 1;
             }
-            size_t idx = rgen.irand(randHigh - randLow) + randLow;
+            int idx = rgen.irand(randHigh - randLow) + randLow;
             out[idx] = 1.f;
         }
         double off = static_cast<double>(offIn[xxn]);
@@ -123,7 +123,7 @@ void ImpulseJitter_next_ai(ImpulseJitter* unit, int inNumSamples) {
     double inc = unit->mPhaseIncrement;
     float freqMul = unit->mFreqMul;
 
-    size_t jitterWidth = static_cast<size_t>(jitterFracIn * inNumSamples);
+    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
 
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
@@ -134,15 +134,15 @@ void ImpulseJitter_next_ai(ImpulseJitter* unit, int inNumSamples) {
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(inc, phase);
         if (impulseResult > 0.5f) {
-            size_t randLow = xxn - jitterWidth;
-            size_t randHigh = xxn + jitterWidth;
+            int randLow = xxn - jitterWidth;
+            int randHigh = xxn + jitterWidth;
             if (randLow < 0) {
                 randLow = 0;
             }
             if (randHigh >= inNumSamples) {
                 randHigh = inNumSamples - 1;
             }
-            size_t idx = rgen.irand(randHigh - randLow) + randLow;
+            int idx = rgen.irand(randHigh - randLow) + randLow;
             out[idx] = 1.f;
         }
         inc = freqIn * freqMul;
@@ -168,7 +168,7 @@ void ImpulseJitter_next_ak(ImpulseJitter* unit, int inNumSamples) {
     double offSlope = CALCSLOPE(off, prevOff);
     bool offChanged = offSlope != 0.f;
 
-    size_t jitterWidth = static_cast<size_t>(jitterFracIn * inNumSamples);
+    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
     
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
@@ -179,15 +179,15 @@ void ImpulseJitter_next_ak(ImpulseJitter* unit, int inNumSamples) {
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(inc, phase);
         if (impulseResult > 0.5f) {
-            size_t randLow = xxn - jitterWidth;
-            size_t randHigh = xxn + jitterWidth;
+            int randLow = xxn - jitterWidth;
+            int randHigh = xxn + jitterWidth;
             if (randLow < 0) {
                 randLow = 0;
             }
             if (randHigh >= inNumSamples) {
                 randHigh = inNumSamples - 1;
             }
-            size_t idx = rgen.irand(randHigh - randLow) + randLow;
+            int idx = rgen.irand(randHigh - randLow) + randLow;
             out[idx] = 1.f;
         }
         if (offChanged) {
@@ -214,7 +214,7 @@ void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples) {
     
     double incSlope = CALCSLOPE(inc, prevInc);
     
-    size_t jitterWidth = static_cast<size_t>(jitterFracIn * inNumSamples);
+    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
 
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
@@ -225,15 +225,15 @@ void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples) {
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(prevInc, phase);
         if (impulseResult > 0.5f) {
-            size_t randLow = xxn - jitterWidth;
-            size_t randHigh = xxn + jitterWidth;
+            int randLow = xxn - jitterWidth;
+            int randHigh = xxn + jitterWidth;
             if (randLow < 0) {
                 randLow = 0;
             }
             if (randHigh >= inNumSamples) {
                 randHigh = inNumSamples - 1;
             }
-            size_t idx = rgen.irand(randHigh - randLow) + randLow;
+            int idx = rgen.irand(randHigh - randLow) + randLow;
             out[idx] = 1.f;
         }
         prevInc += incSlope;
@@ -259,7 +259,7 @@ void ImpulseJitter_next_kk(ImpulseJitter* unit, int inNumSamples) {
     double phaseSlope = CALCSLOPE(off, prevOff);
     bool phOffChanged = phaseSlope != 0.f;
 
-    size_t jitterWidth = static_cast<size_t>(jitterFracIn * inNumSamples);
+    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
 
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
@@ -270,15 +270,15 @@ void ImpulseJitter_next_kk(ImpulseJitter* unit, int inNumSamples) {
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(prevInc, phase);
         if (impulseResult > 0.5f) {
-            size_t randLow = xxn - jitterWidth;
-            size_t randHigh = xxn + jitterWidth;
+            int randLow = xxn - jitterWidth;
+            int randHigh = xxn + jitterWidth;
             if (randLow < 0) {
                 randLow = 0;
             }
             if (randHigh >= inNumSamples) {
                 randHigh = inNumSamples - 1;
             }
-            size_t idx = rgen.irand(randHigh - randLow) + randLow;
+            int idx = rgen.irand(randHigh - randLow) + randLow;
             out[idx] = 1.f;
         }
         if (phOffChanged) {
