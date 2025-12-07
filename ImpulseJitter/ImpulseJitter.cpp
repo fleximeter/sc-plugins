@@ -23,6 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include "SC_PlugIn.h"
+#include <stdio.h>
 
 static InterfaceTable *ft;
 
@@ -56,14 +57,10 @@ static inline float testWrapPhase(double prev_inc, double& phase) {
 struct ImpulseJitter : public Unit {
     double mPhase, mPhaseOffset, mPhaseIncrement;
     float mFreqMul;
+    int mTableMaxSize;
+    int mTableSize;
+    int *mImpulseTable;
 };
-
-void ImpulseJitter_Ctor(ImpulseJitter* unit);
-void ImpulseJitter_next_aa(ImpulseJitter* unit, int inNumSamples);
-void ImpulseJitter_next_ai(ImpulseJitter* unit, int inNumSamples);
-void ImpulseJitter_next_ak(ImpulseJitter* unit, int inNumSamples);
-void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples);
-void ImpulseJitter_next_kk(ImpulseJitter* unit, int inNumSamples);
 
 void ImpulseJitter_next_aa(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
@@ -294,11 +291,109 @@ void ImpulseJitter_next_kk(ImpulseJitter* unit, int inNumSamples) {
     unit->mPhaseIncrement = inc;
 }
 
+void ImpulseJitter_next_ii(ImpulseJitter* unit, int inNumSamples) {
+    float* out = OUT(0);
+    float jitterFracIn = IN0(2);
+    
+    // Collect UGen state
+    double inc = unit->mPhaseIncrement;
+    double phase = unit->mPhase;
+
+    // Compute the jitter width
+    int jitterMaxWidth = inNumSamples + unit->mTableMaxSize;
+    int jitterWidth = static_cast<int>(jitterFracIn * jitterMaxWidth);
+    if (jitterWidth < 0) {
+        jitterWidth = 0;
+    } else if (jitterWidth > jitterMaxWidth) {
+        jitterWidth = jitterMaxWidth;
+    }
+    int jitterLow = 0;
+    //printf("Jitter width: %d\n", jitterWidth);
+
+    // Zero out the output buffer
+    for (int xxn = 0; xxn < inNumSamples; xxn++) {
+        out[xxn] = 0.f;
+    }
+
+    // Update the future buffer and pull impulses from it as necessary
+    for (int xxn = 0; xxn < unit->mTableSize; xxn++) {
+        unit->mImpulseTable[xxn] -= inNumSamples;
+        if (unit->mImpulseTable[xxn] < inNumSamples) {
+            out[unit->mImpulseTable[xxn]] = 1.f;
+            unit->mImpulseTable[xxn] = unit->mImpulseTable[unit->mTableSize - 1];
+            unit->mTableSize--;
+        }
+    }
+
+    RGET
+    for (int xxn = 0; xxn < inNumSamples; xxn++) {
+        float impulseResult = testWrapPhase(inc, phase);
+        if (impulseResult > 0.5f) {
+            int newIdx = rgen.irand(jitterWidth - 1) + jitterLow;
+            if (newIdx >= inNumSamples) {
+                unit->mImpulseTable[unit->mTableSize] = newIdx;
+                unit->mTableSize++;
+            } else {
+                out[newIdx] = 1.f;
+            }
+        }
+        if (jitterLow < xxn / 2 && jitterLow + jitterWidth < jitterMaxWidth - 2) {
+            jitterLow++;
+        }
+        phase += inc;
+    }
+
+    unit->mPhase = phase;
+}
+
+void ImpulseJitter_next_ik(ImpulseJitter* unit, int inNumSamples) {
+    float* out = OUT(0);
+    double off = IN0(1);
+    float jitterFracIn = IN0(2);
+
+    // Collect UGen state
+    double phase = unit->mPhase;
+    double inc = unit->mPhaseIncrement;
+    double prevOff = unit->mPhaseOffset;
+
+    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
+    double phaseSlope = CALCSLOPE(off, prevOff);
+    bool phOffChanged = phaseSlope != 0.f;
+
+    RGET
+    for (int xxn = 0; xxn < inNumSamples; xxn++) {
+        float impulseResult = testWrapPhase(inc, phase);
+        if (impulseResult > 0.5f) {
+            int randLow = xxn - jitterWidth;
+            int randHigh = xxn + jitterWidth;
+            if (randLow < 0) {
+                randLow = 0;
+            }
+            if (randHigh >= inNumSamples) {
+                randHigh = inNumSamples - 1;
+            }
+            int idx = rgen.irand(randHigh - randLow) + randLow;
+            out[idx] = 1.f;
+        }
+        if (phOffChanged) {
+            phase += phaseSlope;
+            testWrapPhase(inc, phase);
+        }
+        phase += inc;
+    }
+
+    unit->mPhase = phase;
+    unit->mPhaseOffset = off;
+}
+
 // Construct the ImpulseJitter
 void ImpulseJitter_Ctor(ImpulseJitter* unit) {
     unit->mPhaseIncrement = IN0(0) * unit->mFreqMul;
     unit->mPhaseOffset = IN0(1);
     unit->mFreqMul = static_cast<float>(unit->mRate->mSampleDur);
+    unit->mTableMaxSize = 2048;  // hard coded for now
+    unit->mTableSize = 0;
+    unit->mImpulseTable = (int*)RTAlloc(unit->mWorld, unit->mTableMaxSize * sizeof(int));
 
     double initOff = unit->mPhaseOffset;
     double initInc = unit->mPhaseIncrement;
@@ -317,27 +412,34 @@ void ImpulseJitter_Ctor(ImpulseJitter* unit) {
         switch (INRATE(1)) {
         case calc_ScalarRate:
             func = (UnitCalcFunc)ImpulseJitter_next_ai;
+            //printf("Calc function set to ai\n");
             break;
         case calc_BufRate:
             func = (UnitCalcFunc)ImpulseJitter_next_ak;
+            //printf("Calc function set to ak\n");
             break;
         case calc_FullRate:
             func = (UnitCalcFunc)ImpulseJitter_next_aa;
+            //printf("Calc function set to aa\n");
             break;
         }
         break;
     case calc_BufRate:
         if (INRATE(1) == calc_ScalarRate) {
             func = (UnitCalcFunc)ImpulseJitter_next_ki;
+            //printf("Calc function set to ki\n");
         } else {
             func = (UnitCalcFunc)ImpulseJitter_next_kk;
+            //printf("Calc function set to kk\n");
         }
         break;
     case calc_ScalarRate:
         if (INRATE(1) == calc_ScalarRate) {
             func = (UnitCalcFunc)ImpulseJitter_next_ki;
+            //printf("Calc function set to ki\n");
         } else {
             func = (UnitCalcFunc)ImpulseJitter_next_kk;
+            //printf("Calc function set to kk\n");
         }
         break;
     }
@@ -349,7 +451,11 @@ void ImpulseJitter_Ctor(ImpulseJitter* unit) {
     unit->mPhaseIncrement = initInc;
 }
 
+void ImpulseJitter_Dtor(ImpulseJitter* unit) {
+    RTFree(unit->mWorld, unit->mImpulseTable);
+}
+
 PluginLoad(ImpulseJitter) {
     ft = inTable;
-    DefineSimpleUnit(ImpulseJitter);
+    DefineDtorUnit(ImpulseJitter);
 }
