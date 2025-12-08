@@ -211,27 +211,36 @@ void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples) {
     
     double incSlope = CALCSLOPE(inc, prevInc);
     
-    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
+    // The maximum distance an impulse can be displaced
+    int jitterWidth = static_cast<int>(jitterFracIn * unit->mTableMaxSize);
 
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         out[xxn] = 0.f;
     }
 
+    // Update the impulse table indices
+    for (int xxn = 0; xxn < unit->mTableSize; xxn++) {
+        unit->mImpulseTable[xxn] -= inNumSamples;
+        if (unit->mImpulseTable[xxn] < inNumSamples) {
+            out[unit->mImpulseTable[xxn]] = 1.f;
+            unit->mImpulseTable[xxn] = -1;
+        }
+    }
+
+    // TODO: Change the table to a min heap
+
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(prevInc, phase);
         if (impulseResult > 0.5f) {
-            int randLow = xxn - jitterWidth;
-            int randHigh = xxn + jitterWidth;
-            if (randLow < 0) {
-                randLow = 0;
+            int idx = rgen.irand(jitterWidth) + xxn;
+            if (idx < inNumSamples) {
+                out[idx] = 1.f;
+            } else if (unit->mTableSize < unit->mTableMaxSize) {
+                unit->mImpulseTable[unit->mTableSize] = idx;
+                unit->mTableSize++;
             }
-            if (randHigh >= inNumSamples) {
-                randHigh = inNumSamples - 1;
-            }
-            int idx = rgen.irand(randHigh - randLow) + randLow;
-            out[idx] = 1.f;
         }
         prevInc += incSlope;
         phase += prevInc;
