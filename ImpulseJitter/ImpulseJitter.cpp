@@ -23,7 +23,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include "SC_PlugIn.h"
+#include "arrayheap.hpp"
 #include <stdio.h>
+#define HEAP_MAX_SIZE 1024
 
 static InterfaceTable *ft;
 
@@ -57,14 +59,12 @@ static inline float testWrapPhase(double prev_inc, double& phase) {
 struct ImpulseJitter : public Unit {
     double mPhase, mPhaseOffset, mPhaseIncrement;
     float mFreqMul;
-    int mTableMaxSize;
-    int mTableSize;
-    int *mImpulseTable;
+    IntMinHeap mImpulseHeap;
 };
 
 void ImpulseJitter_next_aa(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
-    float* freqIn = IN(0);
+    float* freq = IN(0);
     float* offIn = IN(1);
     float jitterFracIn = IN0(2);
     
@@ -74,33 +74,41 @@ void ImpulseJitter_next_aa(ImpulseJitter* unit, int inNumSamples) {
     float freqMul = unit->mFreqMul;
     double prevOff = unit->mPhaseOffset;
     
-    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
+    // The maximum distance an impulse can be displaced
+    int jitterWidth = static_cast<int>(jitterFracIn * unit->mImpulseHeap.maxSize);
 
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         out[xxn] = 0.f;
     }
 
+    // Update the impulse table indices
+    for (int xxn = 1; xxn < unit->mImpulseHeap.size; xxn++) {
+        unit->mImpulseHeap.heap[xxn] -= inNumSamples;
+    }
+
+    // Retrieve impulses for this block
+    while (heapPeek(&unit->mImpulseHeap) < inNumSamples && unit->mImpulseHeap.size > 1) {
+        out[heapPop(&unit->mImpulseHeap)] = 1.f;
+    }
+
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
+        size_t heapEffectiveSize = static_cast<size_t>(HEAP_MAX_SIZE / (12 * sc_log2(freq[xxn])));
         float impulseResult = testWrapPhase(inc, phase);
         if (impulseResult > 0.5f) {
-            int randLow = xxn - jitterWidth;
-            int randHigh = xxn + jitterWidth;
-            if (randLow < 0) {
-                randLow = 0;
+            int idx = rgen.irand(jitterWidth) + xxn;
+            if (idx < inNumSamples) {
+                out[idx] = 1.f;
+            } else if (unit->mImpulseHeap.size < heapEffectiveSize) {
+                heapInsert(&unit->mImpulseHeap, idx);
             }
-            if (randHigh >= inNumSamples) {
-                randHigh = inNumSamples - 1;
-            }
-            int idx = rgen.irand(randHigh - randLow) + randLow;
-            out[idx] = 1.f;
         }
         double off = static_cast<double>(offIn[xxn]);
         double offInc = off - prevOff;
         phase += offInc;
         testWrapPhase(inc, phase);
-        inc = freqIn[xxn] * freqMul;
+        inc = freq[xxn] * freqMul;
         phase += inc;
         prevOff = off;
     }
@@ -112,37 +120,45 @@ void ImpulseJitter_next_aa(ImpulseJitter* unit, int inNumSamples) {
 
 void ImpulseJitter_next_ai(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
-    float freqIn = IN0(0);
+    float freq = IN0(0);
     float jitterFracIn = IN0(2);
+    size_t heapEffectiveSize = static_cast<size_t>(HEAP_MAX_SIZE / (12 * sc_log2(freq)));
 
     // Collect UGen state
     double phase = unit->mPhase;
     double inc = unit->mPhaseIncrement;
     float freqMul = unit->mFreqMul;
 
-    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
+    // The maximum distance an impulse can be displaced
+    int jitterWidth = static_cast<int>(jitterFracIn * unit->mImpulseHeap.maxSize);
 
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         out[xxn] = 0.f;
     }
 
+    // Update the impulse table indices
+    for (int xxn = 1; xxn < unit->mImpulseHeap.size; xxn++) {
+        unit->mImpulseHeap.heap[xxn] -= inNumSamples;
+    }
+
+    // Retrieve impulses for this block
+    while (heapPeek(&unit->mImpulseHeap) < inNumSamples && unit->mImpulseHeap.size > 1) {
+        out[heapPop(&unit->mImpulseHeap)] = 1.f;
+    }
+
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(inc, phase);
         if (impulseResult > 0.5f) {
-            int randLow = xxn - jitterWidth;
-            int randHigh = xxn + jitterWidth;
-            if (randLow < 0) {
-                randLow = 0;
+            int idx = rgen.irand(jitterWidth) + xxn;
+            if (idx < inNumSamples) {
+                out[idx] = 1.f;
+            } else if (unit->mImpulseHeap.size < heapEffectiveSize) {
+                heapInsert(&unit->mImpulseHeap, idx);
             }
-            if (randHigh >= inNumSamples) {
-                randHigh = inNumSamples - 1;
-            }
-            int idx = rgen.irand(randHigh - randLow) + randLow;
-            out[idx] = 1.f;
         }
-        inc = freqIn * freqMul;
+        inc = freq * freqMul;
         phase += inc;
     }
 
@@ -152,9 +168,10 @@ void ImpulseJitter_next_ai(ImpulseJitter* unit, int inNumSamples) {
 
 void ImpulseJitter_next_ak(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
-    float freqIn = IN0(0);
+    float freq = IN0(0);
     double off = IN0(1);
     float jitterFracIn = IN0(2);
+    size_t heapEffectiveSize = static_cast<size_t>(HEAP_MAX_SIZE / (12 * sc_log2(freq)));
     
     // Collect UGen state
     double phase = unit->mPhase;
@@ -165,33 +182,40 @@ void ImpulseJitter_next_ak(ImpulseJitter* unit, int inNumSamples) {
     double offSlope = CALCSLOPE(off, prevOff);
     bool offChanged = offSlope != 0.f;
 
-    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
-    
+    // The maximum distance an impulse can be displaced
+    int jitterWidth = static_cast<int>(jitterFracIn * unit->mImpulseHeap.maxSize);
+
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         out[xxn] = 0.f;
+    }
+
+    // Update the impulse table indices
+    for (int xxn = 1; xxn < unit->mImpulseHeap.size; xxn++) {
+        unit->mImpulseHeap.heap[xxn] -= inNumSamples;
+    }
+
+    // Retrieve impulses for this block
+    while (heapPeek(&unit->mImpulseHeap) < inNumSamples && unit->mImpulseHeap.size > 1) {
+        out[heapPop(&unit->mImpulseHeap)] = 1.f;
     }
 
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(inc, phase);
         if (impulseResult > 0.5f) {
-            int randLow = xxn - jitterWidth;
-            int randHigh = xxn + jitterWidth;
-            if (randLow < 0) {
-                randLow = 0;
+            int idx = rgen.irand(jitterWidth) + xxn;
+            if (idx < inNumSamples) {
+                out[idx] = 1.f;
+            } else if (unit->mImpulseHeap.size < heapEffectiveSize) {
+                heapInsert(&unit->mImpulseHeap, idx);
             }
-            if (randHigh >= inNumSamples) {
-                randHigh = inNumSamples - 1;
-            }
-            int idx = rgen.irand(randHigh - randLow) + randLow;
-            out[idx] = 1.f;
         }
         if (offChanged) {
             phase += offSlope;
             testWrapPhase(inc, phase);
         }
-        inc = freqIn * freqMul;
+        inc = freq * freqMul;
         phase += inc;
     }
 
@@ -202,8 +226,10 @@ void ImpulseJitter_next_ak(ImpulseJitter* unit, int inNumSamples) {
 
 void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
-    double inc = IN0(0) * unit->mFreqMul;
+    double freq = IN0(0);
+    double inc = freq * unit->mFreqMul;
     float jitterFracIn = IN0(2);
+    size_t heapEffectiveSize = static_cast<size_t>(HEAP_MAX_SIZE / (12 * sc_log2(freq)));
 
     // Collect UGen state
     double phase = unit->mPhase;
@@ -212,7 +238,7 @@ void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples) {
     double incSlope = CALCSLOPE(inc, prevInc);
     
     // The maximum distance an impulse can be displaced
-    int jitterWidth = static_cast<int>(jitterFracIn * unit->mTableMaxSize);
+    int jitterWidth = static_cast<int>(jitterFracIn * unit->mImpulseHeap.maxSize);
 
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
@@ -220,15 +246,14 @@ void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples) {
     }
 
     // Update the impulse table indices
-    for (int xxn = 0; xxn < unit->mTableSize; xxn++) {
-        unit->mImpulseTable[xxn] -= inNumSamples;
-        if (unit->mImpulseTable[xxn] < inNumSamples) {
-            out[unit->mImpulseTable[xxn]] = 1.f;
-            unit->mImpulseTable[xxn] = -1;
-        }
+    for (int xxn = 1; xxn < unit->mImpulseHeap.size; xxn++) {
+        unit->mImpulseHeap.heap[xxn] -= inNumSamples;
     }
 
-    // TODO: Change the table to a min heap
+    // Retrieve impulses for this block
+    while (heapPeek(&unit->mImpulseHeap) < inNumSamples && unit->mImpulseHeap.size > 1) {
+        out[heapPop(&unit->mImpulseHeap)] = 1.f;
+    }
 
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
@@ -237,9 +262,8 @@ void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples) {
             int idx = rgen.irand(jitterWidth) + xxn;
             if (idx < inNumSamples) {
                 out[idx] = 1.f;
-            } else if (unit->mTableSize < unit->mTableMaxSize) {
-                unit->mImpulseTable[unit->mTableSize] = idx;
-                unit->mTableSize++;
+            } else if (unit->mImpulseHeap.size < heapEffectiveSize) {
+                heapInsert(&unit->mImpulseHeap, idx);
             }
         }
         prevInc += incSlope;
@@ -252,9 +276,11 @@ void ImpulseJitter_next_ki(ImpulseJitter* unit, int inNumSamples) {
 
 void ImpulseJitter_next_kk(ImpulseJitter* unit, int inNumSamples) {
     float* out = OUT(0);
-    double inc = IN0(0) * unit->mFreqMul;
+    double freq = IN0(0);
+    double inc = freq * unit->mFreqMul;
     double off = IN0(1);
     float jitterFracIn = IN0(2);
+    size_t heapEffectiveSize = static_cast<size_t>(HEAP_MAX_SIZE / (12 * sc_log2(freq)));
 
     // Collect UGen state
     double phase = unit->mPhase;
@@ -265,27 +291,34 @@ void ImpulseJitter_next_kk(ImpulseJitter* unit, int inNumSamples) {
     double phaseSlope = CALCSLOPE(off, prevOff);
     bool phOffChanged = phaseSlope != 0.f;
 
-    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
+    // The maximum distance an impulse can be displaced
+    int jitterWidth = static_cast<int>(jitterFracIn * unit->mImpulseHeap.maxSize);
 
     // Zero out the output buffer
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         out[xxn] = 0.f;
     }
 
+    // Update the impulse table indices
+    for (int xxn = 1; xxn < unit->mImpulseHeap.size; xxn++) {
+        unit->mImpulseHeap.heap[xxn] -= inNumSamples;
+    }
+
+    // Retrieve impulses for this block
+    while (heapPeek(&unit->mImpulseHeap) < inNumSamples && unit->mImpulseHeap.size > 1) {
+        out[heapPop(&unit->mImpulseHeap)] = 1.f;
+    }
+
     RGET
     for (int xxn = 0; xxn < inNumSamples; xxn++) {
         float impulseResult = testWrapPhase(prevInc, phase);
         if (impulseResult > 0.5f) {
-            int randLow = xxn - jitterWidth;
-            int randHigh = xxn + jitterWidth;
-            if (randLow < 0) {
-                randLow = 0;
+            int idx = rgen.irand(jitterWidth) + xxn;
+            if (idx < inNumSamples) {
+                out[idx] = 1.f;
+            } else if (unit->mImpulseHeap.size < heapEffectiveSize) {
+                heapInsert(&unit->mImpulseHeap, idx);
             }
-            if (randHigh >= inNumSamples) {
-                randHigh = inNumSamples - 1;
-            }
-            int idx = rgen.irand(randHigh - randLow) + randLow;
-            out[idx] = 1.f;
         }
         if (phOffChanged) {
             phase += phaseSlope;
@@ -300,109 +333,14 @@ void ImpulseJitter_next_kk(ImpulseJitter* unit, int inNumSamples) {
     unit->mPhaseIncrement = inc;
 }
 
-void ImpulseJitter_next_ii(ImpulseJitter* unit, int inNumSamples) {
-    float* out = OUT(0);
-    float jitterFracIn = IN0(2);
-    
-    // Collect UGen state
-    double inc = unit->mPhaseIncrement;
-    double phase = unit->mPhase;
-
-    // Compute the jitter width
-    int jitterMaxWidth = inNumSamples + unit->mTableMaxSize;
-    int jitterWidth = static_cast<int>(jitterFracIn * jitterMaxWidth);
-    if (jitterWidth < 0) {
-        jitterWidth = 0;
-    } else if (jitterWidth > jitterMaxWidth) {
-        jitterWidth = jitterMaxWidth;
-    }
-    int jitterLow = 0;
-    //printf("Jitter width: %d\n", jitterWidth);
-
-    // Zero out the output buffer
-    for (int xxn = 0; xxn < inNumSamples; xxn++) {
-        out[xxn] = 0.f;
-    }
-
-    // Update the future buffer and pull impulses from it as necessary
-    for (int xxn = 0; xxn < unit->mTableSize; xxn++) {
-        unit->mImpulseTable[xxn] -= inNumSamples;
-        if (unit->mImpulseTable[xxn] < inNumSamples) {
-            out[unit->mImpulseTable[xxn]] = 1.f;
-            unit->mImpulseTable[xxn] = unit->mImpulseTable[unit->mTableSize - 1];
-            unit->mTableSize--;
-        }
-    }
-
-    RGET
-    for (int xxn = 0; xxn < inNumSamples; xxn++) {
-        float impulseResult = testWrapPhase(inc, phase);
-        if (impulseResult > 0.5f) {
-            int newIdx = rgen.irand(jitterWidth - 1) + jitterLow;
-            if (newIdx >= inNumSamples) {
-                unit->mImpulseTable[unit->mTableSize] = newIdx;
-                unit->mTableSize++;
-            } else {
-                out[newIdx] = 1.f;
-            }
-        }
-        if (jitterLow < xxn / 2 && jitterLow + jitterWidth < jitterMaxWidth - 2) {
-            jitterLow++;
-        }
-        phase += inc;
-    }
-
-    unit->mPhase = phase;
-}
-
-void ImpulseJitter_next_ik(ImpulseJitter* unit, int inNumSamples) {
-    float* out = OUT(0);
-    double off = IN0(1);
-    float jitterFracIn = IN0(2);
-
-    // Collect UGen state
-    double phase = unit->mPhase;
-    double inc = unit->mPhaseIncrement;
-    double prevOff = unit->mPhaseOffset;
-
-    int jitterWidth = static_cast<int>(jitterFracIn * inNumSamples);
-    double phaseSlope = CALCSLOPE(off, prevOff);
-    bool phOffChanged = phaseSlope != 0.f;
-
-    RGET
-    for (int xxn = 0; xxn < inNumSamples; xxn++) {
-        float impulseResult = testWrapPhase(inc, phase);
-        if (impulseResult > 0.5f) {
-            int randLow = xxn - jitterWidth;
-            int randHigh = xxn + jitterWidth;
-            if (randLow < 0) {
-                randLow = 0;
-            }
-            if (randHigh >= inNumSamples) {
-                randHigh = inNumSamples - 1;
-            }
-            int idx = rgen.irand(randHigh - randLow) + randLow;
-            out[idx] = 1.f;
-        }
-        if (phOffChanged) {
-            phase += phaseSlope;
-            testWrapPhase(inc, phase);
-        }
-        phase += inc;
-    }
-
-    unit->mPhase = phase;
-    unit->mPhaseOffset = off;
-}
-
 // Construct the ImpulseJitter
 void ImpulseJitter_Ctor(ImpulseJitter* unit) {
     unit->mPhaseIncrement = IN0(0) * unit->mFreqMul;
     unit->mPhaseOffset = IN0(1);
     unit->mFreqMul = static_cast<float>(unit->mRate->mSampleDur);
-    unit->mTableMaxSize = 2048;  // hard coded for now
-    unit->mTableSize = 0;
-    unit->mImpulseTable = (int*)RTAlloc(unit->mWorld, unit->mTableMaxSize * sizeof(int));
+    unit->mImpulseHeap.maxSize = HEAP_MAX_SIZE;  // hard coded for now
+    unit->mImpulseHeap.size = 1;
+    unit->mImpulseHeap.heap = (int*)RTAlloc(unit->mWorld, HEAP_MAX_SIZE * sizeof(int));
 
     double initOff = unit->mPhaseOffset;
     double initInc = unit->mPhaseIncrement;
@@ -461,7 +399,7 @@ void ImpulseJitter_Ctor(ImpulseJitter* unit) {
 }
 
 void ImpulseJitter_Dtor(ImpulseJitter* unit) {
-    RTFree(unit->mWorld, unit->mImpulseTable);
+    RTFree(unit->mWorld, unit->mImpulseHeap.heap);
 }
 
 PluginLoad(ImpulseJitter) {
