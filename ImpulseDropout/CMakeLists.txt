@@ -17,7 +17,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 set(FILENAME "ImpulseDropout.cpp") #specify the .cpp file here
-# set(SC_PATH "D:/SuperCollider_Build/supercollider")
 cmake_minimum_required (VERSION 3.5)
 get_filename_component(PROJECT ${FILENAME} NAME_WE) #automatically sets project name from the filename
 # set(PROJECT "my_name") #alternatively set project name manually
@@ -97,7 +96,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
     endif()
 
     # Plugin headers require C++11, which must be explicitly enabled for gcc and clang.
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    # NOTE: I changed this to C++14 because of a compatibility issue in supercollider/include/plugin_interface/SC_Unit.h.
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
     if(CMAKE_COMPILER_IS_CLANG)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
     endif()
