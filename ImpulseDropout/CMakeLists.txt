@@ -108,8 +108,32 @@ if(MINGW)
 endif()
 
 add_library(${PROJECT} MODULE ${FILENAME})
+
+if(NOT DEFINED EXTENSIONS_DIR)
+    if (WIN32)
+        set(EXTENSIONS_DIR %LOCALAPPDATA%/SuperCollider/Extensions)
+    elseif (APPLE)
+        set(EXTENSIONS_DIR "~/Library/Application Support/SuperCollider/Extensions")
+    elseif (UNIX)
+        set(EXTENSIONS_DIR ~/.local/share/SuperCollider/Extensions)
+    endif()
+endif()
+install(TARGETS ${PROJECT}
+    LIBRARY DESTINATION ${EXTENSIONS_DIR}/Jeff/Plugins
+)
+install(FILES ${PROJECT}.sc
+    DESTINATION ${EXTENSIONS_DIR}/Jeff/Classes
+    PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ 
+)
+install(FILES ${PROJECT}.schelp
+    DESTINATION ${EXTENSIONS_DIR}/Jeff/HelpSource/Classes
+    PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ 
+)
 if(SUPERNOVA)
     add_library(${PROJECT}_supernova MODULE ${FILENAME})
     set_property(TARGET ${PROJECT}_supernova
                  PROPERTY COMPILE_DEFINITIONS SUPERNOVA)
+    install(TARGETS ${PROJECT}_supernova
+        LIBRARY DESTINATION ${EXTENSIONS_DIR}/Jeff/Plugins
+    )
 endif()
