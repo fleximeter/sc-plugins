@@ -1,0 +1,49 @@
+class:: PV_CFreeze
+summary:: Modified PV_MagFreeze for phase vocoder freezing
+related:: Classes/PV_MagFreeze, Classes/PV_Freeze
+categories:: Libraries>JeffUGens, UGens>FFT
+related:: Guides/FFT-Overview
+
+Description::
+
+PV_CFreeze performs a phase vocoder spectral freeze. In a classic spectral freeze,
+the magnitudes are frozen and the phase is updated with phase differences for each new
+FFT frame. This implementation is based on Jean-François Charles' Max patch for freezing,
+where the last N magnitude spectra are retained and the freeze randomly chooses among them.
+This makes the frozen spectrum a bit less static.
+
+note::
+The strong::frameMemory:: parameter can only be set once--on initialization.
+::
+
+note::
+In order to freeze the spectrum successfully, you will need to allow N FFT frames to
+pass through PV_CFreeze first (where N = strong::frameMemory::).
+::
+
+classmethods::
+
+method::new
+
+argument::buffer
+The FFT buffer
+
+argument::freeze
+When set to > 0, the spectrum will be frozen.
+
+argument::frameMemory
+The number of previous frames to remember before freezing
+
+Examples::
+
+code::
+{
+	var sig, chain;
+	sig = SoundIn.ar(0);
+	chain = FFT(LocalBuf(2048), sig);
+	chain = PV_CFreeze(chain, Env([0, 0, 1, 1], [1, 1e-4, inf], 'lin').kr, 8);
+	sig = IFFT(chain);
+	sig = Pan2.ar(sig);
+	Out.ar(0, sig);
+}.play;
+::
