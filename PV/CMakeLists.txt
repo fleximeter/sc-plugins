@@ -23,7 +23,9 @@ get_filename_component(PROJECT ${FILENAME} NAME_WE) #automatically sets project 
 message(STATUS "Project name is ${PROJECT}")
 project (${PROJECT})
 
-set(SC_PATH "~/data/source/supercollider")
+if(NOT DEFINED SC_PATH)
+    set(SC_PATH "~/data/source/supercollider")
+endif()
 include_directories(${SC_PATH}/include/plugin_interface)
 include_directories(${SC_PATH}/include/common)
 include_directories(${SC_PATH}/common)
