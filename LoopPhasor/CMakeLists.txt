@@ -23,6 +23,8 @@ get_filename_component(PROJECT ${FILENAME} NAME_WE) #automatically sets project 
 message(STATUS "Project name is ${PROJECT}")
 project (${PROJECT})
 
+# Use the environment variable for the SC path if set
+set(SC_PATH $ENV{SC_PATH} CACHE STRING "Path to SuperCollider source")
 include_directories(${SC_PATH}/include/plugin_interface)
 include_directories(${SC_PATH}/include/common)
 include_directories(${SC_PATH}/common)
