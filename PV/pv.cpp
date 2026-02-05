@@ -40,6 +40,13 @@ struct PV_CFreeze : public Unit {
     size_t mWritePtr;   // The write pointer
 };
 
+struct PV_BinRandomMask : public Unit {
+    bool *mBinMasks;         // The bin masks
+    bool mDcMask, mNyqMask;  // The masks for DC and Nyquist
+    float mTrig;             // The trigger for recomputing the mask
+    int mNumBins;            // The number of FFT bins
+};
+
 static void PV_CFreeze_next(PV_CFreeze *unit, int inNumSamples) {
     PV_GET_BUF
     float freezeState = IN0(1);
@@ -75,22 +82,22 @@ static void PV_CFreeze_next(PV_CFreeze *unit, int inNumSamples) {
         // Pull random DC and nyquist magnitudes
         p->dc = unit->mDc[rgen.irand(unit->mNumFrames)];
         p->nyq = unit->mNyq[rgen.irand(unit->mNumFrames)];
-        for (int i = 0; i < unit->mNumBins; i++) {
+        for (int xxn = 0; xxn < unit->mNumBins; xxn++) {
             // For each bin, grab a random magnitude and phase diff pair
             int idx = rgen.irand(unit->mNumFrames);
-            idx = idx * unit->mNumBins + i;
-            p->bin[i].mag = unit->mMags[idx];
-            unit->mPhase[i] = sc_wrap(unit->mPhase[i] + unit->mPhaseDiffs[idx], 0.f, static_cast<float>(twopi));
-            p->bin[i].phase = unit->mPhase[i];
+            idx = idx * unit->mNumBins + xxn;
+            p->bin[xxn].mag = unit->mMags[idx];
+            unit->mPhase[xxn] = sc_wrap(unit->mPhase[xxn] + unit->mPhaseDiffs[idx], 0.f, static_cast<float>(twopi));
+            p->bin[xxn].phase = unit->mPhase[xxn];
         }
     } else {
         // We're writing to a circular buffer, so pull the current magnitude and phase diff arrays
         float *currentMagArr = unit->mMags + (unit->mWritePtr * unit->mNumBins);
         float *currentPhaseDiffArr = unit->mPhaseDiffs + (unit->mWritePtr * unit->mNumBins);
-        for (int i = 0; i < numbins; i++) {
-            currentMagArr[i] = p->bin[i].mag;
-            currentPhaseDiffArr[i] = sc_wrap(p->bin[i].phase - unit->mPhase[i], 0.f, static_cast<float>(twopi));
-            unit->mPhase[i] = p->bin[i].phase;
+        for (int xxn = 0; xxn < numbins; xxn++) {
+            currentMagArr[xxn] = p->bin[xxn].mag;
+            currentPhaseDiffArr[xxn] = sc_wrap(p->bin[xxn].phase - unit->mPhase[xxn], 0.f, static_cast<float>(twopi));
+            unit->mPhase[xxn] = p->bin[xxn].phase;
         }
         unit->mDc[unit->mWritePtr] = p->dc;
         unit->mNyq[unit->mWritePtr] = p->nyq;
@@ -120,7 +127,94 @@ static void PV_CFreeze_Dtor(PV_CFreeze *unit) {
     RTFree(unit->mWorld, unit->mPhaseDiffs);
 }
 
-PluginLoad(PV_CFreeze) {
+static void PV_BinRandomMask_next(PV_BinRandomMask *unit, int inNumSamples) {
+    PV_GET_BUF
+    float mask = IN0(1);
+    float prob = IN0(2);
+    float expCurve = IN0(3);
+    float trig = IN0(4);
+    prob = sc_clip(prob, 0.f, 1.f);
+
+    // Initialize mask first time
+    if (!unit->mBinMasks) {
+        unit->mBinMasks = (bool*)RTAlloc(unit->mWorld, numbins * sizeof(bool));
+        unit->mNumBins = numbins;
+        RGET
+        for (int xxn = 0; xxn < numbins; xxn++) {
+            if (rgen.frand() > (1.f - prob) * sc_pow(2.f, (xxn + 1) * expCurve)) {
+                unit->mBinMasks[xxn] = false;
+            } else {
+                unit->mBinMasks[xxn] = true;
+            }
+        }
+        if (rgen.frand() > 1.f - prob) {
+            unit->mDcMask = false;
+        } else {
+            unit->mDcMask = true;
+        }
+        if (rgen.frand() > (1.f - prob) * sc_pow(2.f, (numbins) * expCurve)) {
+            unit->mNyqMask = false;
+        } else {
+            unit->mNyqMask = true;
+        }
+    } else if (unit->mNumBins != numbins) {
+        return;
+    }
+
+    // Recompute mask
+    if (trig > 0.f && unit->mTrig == 0.f) {
+        RGET
+        for (int xxn = 0; xxn < numbins; xxn++) {
+            if (rgen.frand() > (1.f - prob) * sc_pow(2.f, (xxn + 1) * expCurve)) {
+                unit->mBinMasks[xxn] = false;
+            } else {
+                unit->mBinMasks[xxn] = true;
+            }
+        }
+        if (rgen.frand() > 1.f - prob) {
+            unit->mDcMask = false;
+        } else {
+            unit->mDcMask = true;
+        }
+        if (rgen.frand() > (1.f - prob) * sc_pow(2.f, (numbins) * expCurve)) {
+            unit->mNyqMask = false;
+        } else {
+            unit->mNyqMask = true;
+        }
+    }
+
+    SCPolarBuf *p = ToPolarApx(buf);
+
+    // Apply mask
+    for (int xxn = 0; xxn < numbins; xxn++) {
+        if (!unit->mBinMasks[xxn]) {
+            p->bin[xxn].mag = mask;
+        }
+    }
+    if (!unit->mDcMask) {
+        p->dc = mask;
+    }
+    if (!unit->mNyqMask) {
+        p->nyq = mask;
+    }
+    unit->mTrig = trig;
+}
+
+static void PV_BinRandomMask_Ctor(PV_BinRandomMask *unit) {
+    SETCALC(PV_BinRandomMask_next);
+    unit->mBinMasks = nullptr;
+    unit->mTrig = 0.f;
+    OUT0(0) = IN0(0);
+}
+
+static void PV_BinRandomMask_Dtor(PV_BinRandomMask *unit) {
+    if (unit->mBinMasks) {
+        RTFree(unit->mWorld, unit->mBinMasks);
+    }
+}
+
+PluginLoad(PV_Jeff) {
     ft = inTable;
     DefineDtorUnit(PV_CFreeze);
+    DefineDtorUnit(PV_BinRandomMask);
 }

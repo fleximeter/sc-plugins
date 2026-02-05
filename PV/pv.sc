@@ -30,3 +30,13 @@ PV_CFreeze : PV_ChainUGen {
         ^this.multiNew('control', buffer, freeze, frameMemory);
     }
 }
+
+// PV_ZeroRandomBins randomly zeroes the magnitudes of spectral bins
+// given a probability. The same bins will be zeroed each time until
+// the trigger is set again.
+PV_BinRandomMask : PV_ChainUGen {
+    *new {
+        arg buffer, mask = 0.0, prob = 0.0, expCurve = -1.0, trigger = 0.0;
+        ^this.multiNew('control', buffer, mask, prob, expCurve, trigger);
+    }
+}

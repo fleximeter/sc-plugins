@@ -1,0 +1,43 @@
+class:: PV_BinRandomMask
+summary:: Applies a random mask to a FFT chain
+related:: Classes/PV_BinScramble
+categories:: Libraries>JeffUGens, UGens>FFT
+related:: Guides/FFT-Overview
+
+Description::
+
+PV_BinRandomMask applies a mask to the magnitudes of randomly selected FFT bins.
+The random distribution is an exponential distribution, shaped by the strong::prob:: and strong::expCurve:: parameters.
+
+classmethods::
+
+method::new
+
+argument::buffer
+The FFT buffer
+
+argument::mask
+The replacement magnitude that will be applied to the randomly selected bins
+
+argument::prob
+The probability that the DC bin will be selected.
+
+argument::expCurve
+A probability adjustment coefficient. Small values are probably better here.
+
+argument::trigger
+Triggers a new selection of random bins for masking
+
+Examples::
+
+code::
+{
+    var sig, chain;
+    sig = SoundIn.ar(0);
+    chain = FFT(LocalBuf(2048), sig);
+    chain = PV_BinRandomMask(chain, 0, 0.4, -1e2);
+    sig = IFFT(chain);
+    sig = Pan2.ar(sig);
+    Out.ar(0, sig);
+}.play;
+::

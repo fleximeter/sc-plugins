@@ -8,18 +8,19 @@ Description::
 
 PV_CFreeze performs a phase vocoder spectral freeze. In a classic spectral freeze,
 the magnitudes are frozen and the phase is updated with phase differences for each new
-FFT frame. This implementation is based on Jean-François Charles' Max patch for freezing,
+FFT frame. This implementation is based on Jean-François Charles' Max patch for freezing footnote::The original Max patches are available at link::https://newfloremusic.gumroad.com/::. ::,
 which follows this algorithm:
 
-1. When not freezing, store the last N magnitude spectra in a circular buffer.
-Also store the corresponding last N phase differences in a circular buffer.
-2. When freezing, perform the following steps for each output FFT frame:
-   a. For each bin, choose a random magnitude and phase difference pair from the last N frames stored in the circular buffers.
-   b. Compute the output phases based on the last phases and the phase differences selected in (a).
-   Store these phases internally.
-   c. Output the custom magnitude and phase spectra.
-3. To reduce unwanted spectral noise artifacts, apply a noise gate to the spectrum before running the IFFT.
-
+numberedlist::
+## When not freezing, store the last N magnitude spectra in a circular buffer. Also store the corresponding last N phase differences in a circular buffer.
+## When freezing, perform the following steps for each output FFT frame:
+numberedlist::
+## For each bin, choose a random magnitude and phase difference pair from the last N frames stored in the circular buffers.
+## Compute the output phases based on the last phases and the phase differences selected in (a). Store these phases internally.
+## Output the custom magnitude and phase spectra.
+::
+## To reduce unwanted spectral noise artifacts, apply a noise gate to the spectrum before running the IFFT.
+::
 Since there is already functionality available for spectral noise gating in SuperCollider,
 PV_CFreeze does not implement step 3 internally.
 
