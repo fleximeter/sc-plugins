@@ -17,7 +17,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 set(FILENAME "pv.cpp") #specify the .cpp file here
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 3.5)
 get_filename_component(PROJECT ${FILENAME} NAME_WE) #automatically sets project name from the filename
 # set(PROJECT "my_name") #alternatively set project name manually
 message(STATUS "Project name is ${PROJECT}")

@@ -9,8 +9,19 @@ Description::
 PV_CFreeze performs a phase vocoder spectral freeze. In a classic spectral freeze,
 the magnitudes are frozen and the phase is updated with phase differences for each new
 FFT frame. This implementation is based on Jean-François Charles' Max patch for freezing,
-where the last N magnitude spectra are retained and the freeze randomly chooses among them.
-This makes the frozen spectrum a bit less static.
+which follows this algorithm:
+
+1. When not freezing, store the last N magnitude spectra in a circular buffer.
+Also store the corresponding last N phase differences in a circular buffer.
+2. When freezing, perform the following steps for each output FFT frame:
+   a. For each bin, choose a random magnitude and phase difference pair from the last N frames stored in the circular buffers.
+   b. Compute the output phases based on the last phases and the phase differences selected in (a).
+   Store these phases internally.
+   c. Output the custom magnitude and phase spectra.
+3. To reduce unwanted spectral noise artifacts, apply a noise gate to the spectrum before running the IFFT.
+
+Since there is already functionality available for spectral noise gating in SuperCollider,
+PV_CFreeze does not implement step 3 internally.
 
 note::
 The strong::frameMemory:: parameter can only be set once--on initialization.
@@ -38,12 +49,14 @@ Examples::
 
 code::
 {
-	var sig, chain;
-	sig = SoundIn.ar(0);
-	chain = FFT(LocalBuf(2048), sig);
-	chain = PV_CFreeze(chain, Env([0, 0, 1, 1], [1, 1e-4, inf], 'lin').kr, 8);
-	sig = IFFT(chain);
-	sig = Pan2.ar(sig);
-	Out.ar(0, sig);
+    var sig, chain;
+    sig = SoundIn.ar(0);
+    chain = FFT(LocalBuf(2048), sig);
+    chain = PV_CFreeze(chain, Env([0, 0, 1, 1], [1, 1e-4, inf], 'lin').kr, 8);
+	// Apply a spectral noise gate
+	chain = PV_MagAbove(chain, FFTPeak.kr(chain)[1] * 0.07);
+    sig = IFFT(chain);
+    sig = Pan2.ar(sig);
+    Out.ar(0, sig);
 }.play;
 ::

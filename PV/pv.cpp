@@ -36,7 +36,7 @@ struct PV_CFreeze : public Unit {
     float *mDc;      // The 1D array of FFT DC values
     float *mNyq;     // The 1D array of FFT Nyquist values
     float *mPhase;   // The most recent phase array
-    float *mPhaseDiffs;  // The array of FFT phase differences
+    float *mPhaseDiffs;  // The 2D array of FFT phase differences
     size_t mWritePtr;   // The write pointer
 };
 
@@ -45,7 +45,7 @@ static void PV_CFreeze_next(PV_CFreeze *unit, int inNumSamples) {
     float freezeState = IN0(1);
     // allocate the buffers
     if (!unit->mMags) {
-        // MxN where N is num bins, and M is num frames
+        // MxN where N is num bins, and M is num frames. Acts as a circular buffer.
         unit->mMags = (float*)RTAlloc(unit->mWorld, numbins * sizeof(float) * unit->mNumFrames);
         // M (num frames)
         unit->mDc = (float*)RTAlloc(unit->mWorld, sizeof(float) * unit->mNumFrames);
@@ -53,8 +53,9 @@ static void PV_CFreeze_next(PV_CFreeze *unit, int inNumSamples) {
         unit->mNyq = (float*)RTAlloc(unit->mWorld, sizeof(float) * unit->mNumFrames);
         // N (num bins)
         unit->mPhase = (float*)RTAlloc(unit->mWorld, numbins * sizeof(float));
-        // N (num bins)
-        unit->mPhaseDiffs = (float*)RTAlloc(unit->mWorld, numbins * sizeof(float));
+        // MxN where N is num bins, and M is num frames.
+        // Acts as a circular buffer corresponding to unit->mMags.
+        unit->mPhaseDiffs = (float*)RTAlloc(unit->mWorld, numbins * sizeof(float) * unit->mNumFrames);
         ClearFFTUnitIfMemFailed(unit->mMags);
         ClearFFTUnitIfMemFailed(unit->mDc);
         ClearFFTUnitIfMemFailed(unit->mNyq);
@@ -63,6 +64,7 @@ static void PV_CFreeze_next(PV_CFreeze *unit, int inNumSamples) {
         unit->mNumBins = numbins;
         unit->mWritePtr = 0;
     } else if (numbins != unit->mNumBins) {
+        // Cannot allow the FFT size to change
         return;
     }
 
@@ -70,20 +72,24 @@ static void PV_CFreeze_next(PV_CFreeze *unit, int inNumSamples) {
 
     if (freezeState > 0.f) {
         RGET
-        int idx = rgen.irand(unit->mNumFrames);
-        float *mags = unit->mMags + (idx * unit->mNumBins);
-        p->dc = unit->mDc[idx];
-        p->nyq = unit->mNyq[idx];
+        // Pull random DC and nyquist magnitudes
+        p->dc = unit->mDc[rgen.irand(unit->mNumFrames)];
+        p->nyq = unit->mNyq[rgen.irand(unit->mNumFrames)];
         for (int i = 0; i < unit->mNumBins; i++) {
-            p->bin[i].mag = mags[i];
-            unit->mPhase[i] = sc_wrap(unit->mPhase[i] + unit->mPhaseDiffs[i], 0.f, static_cast<float>(twopi));
+            // For each bin, grab a random magnitude and phase diff pair
+            int idx = rgen.irand(unit->mNumFrames);
+            idx = idx * unit->mNumBins + i;
+            p->bin[i].mag = unit->mMags[idx];
+            unit->mPhase[i] = sc_wrap(unit->mPhase[i] + unit->mPhaseDiffs[idx], 0.f, static_cast<float>(twopi));
             p->bin[i].phase = unit->mPhase[i];
         }
     } else {
+        // We're writing to a circular buffer, so pull the current magnitude and phase diff arrays
         float *currentMagArr = unit->mMags + (unit->mWritePtr * unit->mNumBins);
+        float *currentPhaseDiffArr = unit->mPhaseDiffs + (unit->mWritePtr * unit->mNumBins);
         for (int i = 0; i < numbins; i++) {
             currentMagArr[i] = p->bin[i].mag;
-            unit->mPhaseDiffs[i] = sc_wrap(p->bin[i].phase - unit->mPhase[i], 0.f, static_cast<float>(twopi));
+            currentPhaseDiffArr[i] = sc_wrap(p->bin[i].phase - unit->mPhase[i], 0.f, static_cast<float>(twopi));
             unit->mPhase[i] = p->bin[i].phase;
         }
         unit->mDc[unit->mWritePtr] = p->dc;
