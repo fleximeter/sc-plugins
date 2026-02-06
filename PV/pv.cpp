@@ -120,11 +120,26 @@ static void PV_CFreeze_Ctor(PV_CFreeze *unit) {
 }
 
 static void PV_CFreeze_Dtor(PV_CFreeze *unit) {
-    RTFree(unit->mWorld, unit->mMags);
-    RTFree(unit->mWorld, unit->mDc);
-    RTFree(unit->mWorld, unit->mNyq);
-    RTFree(unit->mWorld, unit->mPhase);
-    RTFree(unit->mWorld, unit->mPhaseDiffs);
+    if (unit->mMags) {
+        RTFree(unit->mWorld, unit->mMags);
+        unit->mMags = nullptr;
+    }
+    if (unit->mDc) {
+        RTFree(unit->mWorld, unit->mDc);
+        unit->mDc = nullptr;
+    }
+    if (unit->mNyq) {
+        RTFree(unit->mWorld, unit->mNyq);
+        unit->mNyq = nullptr;
+    }
+    if (unit->mPhase) {
+        RTFree(unit->mWorld, unit->mPhase);
+        unit->mPhase = nullptr;
+    }
+    if (unit->mPhaseDiffs) {
+        RTFree(unit->mWorld, unit->mPhaseDiffs);
+        unit->mPhaseDiffs = nullptr;
+    }
 }
 
 static void PV_BinRandomMask_next(PV_BinRandomMask *unit, int inNumSamples) {
@@ -210,6 +225,7 @@ static void PV_BinRandomMask_Ctor(PV_BinRandomMask *unit) {
 static void PV_BinRandomMask_Dtor(PV_BinRandomMask *unit) {
     if (unit->mBinMasks) {
         RTFree(unit->mWorld, unit->mBinMasks);
+        unit->mBinMasks = nullptr;
     }
 }
 
