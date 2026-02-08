@@ -41,10 +41,25 @@ PV_BinRandomMask : PV_ChainUGen {
     }
 }
 
+// PV_MagMirror mirrors spectral magnitudes.
+PV_MagMirror : PV_ChainUGen {
+    *new {
+        arg buffer;
+        ^this.multiNew('control', buffer);
+    }
+}
+
 // PV_MagSqueeze squeezes the magnitudes of all spectral bins to fit into the range [low, high].
 PV_MagSqueeze : PV_ChainUGen {
     *new {
         arg buffer, low = 0.0, high = 1.0;
         ^this.multiNew('control', buffer, low, high);
+    }
+}
+
+PV_MagSqueeze1 : PV_ChainUGen {
+    *new {
+        arg buffer;
+        ^this.multiNew('control', buffer);
     }
 }

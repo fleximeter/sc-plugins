@@ -127,7 +127,7 @@ install(FILES ${PROJECT}.sc
     DESTINATION ${EXTENSIONS_DIR}/Jeff/Classes
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ 
 )
-install(FILES PV_CFreeze.schelp PV_BinRandomMask.schelp PV_MagSqueeze.schelp
+install(FILES PV_CFreeze.schelp PV_BinRandomMask.schelp PV_MagSqueeze.schelp PV_MagSqueeze1.schelp PV_MagMirror.schelp
     DESTINATION ${EXTENSIONS_DIR}/Jeff/HelpSource/Classes
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ 
 )

@@ -49,6 +49,10 @@ struct PV_BinRandomMask : public Unit {
 
 struct PV_MagSqueeze : public Unit {};
 
+struct PV_MagSqueeze1 : public Unit {};
+
+struct PV_MagMirror : public Unit {};
+
 static void PV_CFreeze_next(PV_CFreeze *unit, int inNumSamples) {
     PV_GET_BUF
     float freezeState = IN0(1);
@@ -248,11 +252,11 @@ static void PV_MagSqueeze_next(PV_MagSqueeze *unit, int inNumSamples) {
         if (p->bin[i].mag > max)
             max = p->bin[i].mag;
     }
-    float range = max - min;
-    p->dc = (p->dc / max) * range + min;
-    p->nyq = (p->nyq / max) * range + min;
+    float range = high - low;
+    p->dc = (p->dc / max) * range + low;
+    p->nyq = (p->nyq / max) * range + low;
     for (int i = 0; i < numbins; i++) {
-        p->bin[i].mag = (p->bin[i].mag / max) * range + min;
+        p->bin[i].mag = (p->bin[i].mag / max) * range + low;
     }
 }
 
@@ -261,9 +265,66 @@ static void PV_MagSqueeze_Ctor(PV_MagSqueeze *unit) {
     OUT0(0) = IN0(0);
 }
 
+static void PV_MagSqueeze1_next(PV_MagSqueeze1 *unit, int inNumSamples) {
+    PV_GET_BUF
+    SCPolarBuf *p = ToPolarApx(buf);
+    float min = p->dc;
+    float max = p->dc;
+    if (p->nyq < min)
+        min = p->nyq;
+    if (p->nyq > max)
+        max = p->nyq;
+    for (int i = 0; i < numbins; i++) {
+        if (p->bin[i].mag < min)
+            min = p->bin[i].mag;
+        if (p->bin[i].mag > max)
+            max = p->bin[i].mag;
+    }
+    float range = max - min;
+    p->dc = (p->dc / max) * range + min;
+    p->nyq = (p->nyq / max) * range + min;
+    for (int i = 0; i < numbins; i++) {
+        p->bin[i].mag = (p->bin[i].mag / max) * range + min;
+    }
+}
+
+static void PV_MagSqueeze1_Ctor(PV_MagSqueeze1 *unit) {
+    SETCALC(PV_MagSqueeze1_next);
+    OUT0(0) = IN0(0);
+}
+
+static void PV_MagMirror_next(PV_MagMirror *unit, int inNumSamples) {
+    PV_GET_BUF
+    SCPolarBuf *p = ToPolarApx(buf);
+    float min = p->dc;
+    float max = p->dc;
+    if (p->nyq < min)
+        min = p->nyq;
+    if (p->nyq > max)
+        max = p->nyq;
+    for (int i = 0; i < numbins; i++) {
+        if (p->bin[i].mag < min)
+            min = p->bin[i].mag;
+        if (p->bin[i].mag > max)
+            max = p->bin[i].mag;
+    }
+    p->dc = max - p->dc + min;
+    p->nyq = max - p->nyq + min;
+    for (int i = 0; i < numbins; i++) {
+        p->bin[i].mag = max - p->bin[i].mag + min;
+    }
+}
+
+static void PV_MagMirror_Ctor(PV_MagMirror *unit) {
+    SETCALC(PV_MagMirror_next);
+    OUT0(0) = IN0(0);
+}
+
 PluginLoad(PV_Jeff) {
     ft = inTable;
+    DefineSimpleUnit(PV_MagMirror);
     DefineSimpleUnit(PV_MagSqueeze);
+    DefineSimpleUnit(PV_MagSqueeze1);
     DefineDtorUnit(PV_CFreeze);
     DefineDtorUnit(PV_BinRandomMask);
 }
