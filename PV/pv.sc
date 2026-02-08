@@ -63,3 +63,11 @@ PV_MagSqueeze1 : PV_ChainUGen {
         ^this.multiNew('control', buffer);
     }
 }
+
+// An equal power crossfade of the magnitudes of two FFT buffers
+PV_MagXFade : PV_ChainUGen {
+    *new {
+        arg buffer1, buffer2, fade=0.0;
+        ^this.multiNew('control', buffer1, buffer2, fade);
+    }
+}

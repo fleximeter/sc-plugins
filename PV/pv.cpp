@@ -53,6 +53,8 @@ struct PV_MagSqueeze1 : public Unit {};
 
 struct PV_MagMirror : public Unit {};
 
+struct PV_MagXFade : public Unit {};
+
 static void PV_CFreeze_next(PV_CFreeze *unit, int inNumSamples) {
     PV_GET_BUF
     float freezeState = IN0(1);
@@ -320,11 +322,39 @@ static void PV_MagMirror_Ctor(PV_MagMirror *unit) {
     OUT0(0) = IN0(0);
 }
 
+static void PV_MagXFade_next(PV_MagXFade *unit, int inNumSamples) {
+    PV_GET_BUF2
+    float crossfade = IN0(2);
+    crossfade = sc_clip(crossfade, 0.f, 1.f);
+    SCPolarBuf *p = ToPolarApx(buf1);
+    SCPolarBuf *q = ToPolarApx(buf2);
+    // use sqrt crossfade (https://dsp.stackexchange.com/questions/37477/understanding-equal-power-crossfades)
+    float pCoef = 1.f, qCoef = 0.f;
+    if (crossfade == 1.f) {
+        pCoef = 0.f;
+        qCoef = 1.f;
+    } else if (crossfade > 0.f) {
+        pCoef = sc_sqrt(1.f - crossfade);
+        qCoef = sc_sqrt(crossfade);
+    }
+    p->dc = p->dc * pCoef + q->dc * qCoef;
+    p->nyq = p->nyq * pCoef + q->nyq * qCoef;
+    for (int i = 0; i < numbins; i++) {
+        p->bin[i].mag = p->bin[i].mag * pCoef + q->bin[i].mag * qCoef;
+    }
+}
+
+static void PV_MagXFade_Ctor(PV_MagXFade *unit) {
+    SETCALC(PV_MagXFade_next);
+    OUT0(0) = IN0(0);
+}
+
 PluginLoad(PV_Jeff) {
     ft = inTable;
     DefineSimpleUnit(PV_MagMirror);
     DefineSimpleUnit(PV_MagSqueeze);
     DefineSimpleUnit(PV_MagSqueeze1);
+    DefineSimpleUnit(PV_MagXFade);
     DefineDtorUnit(PV_CFreeze);
     DefineDtorUnit(PV_BinRandomMask);
 }

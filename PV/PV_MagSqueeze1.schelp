@@ -1,13 +1,12 @@
 class:: PV_MagSqueeze1
-summary:: Squeezes the magnitudes of FFT bins
+summary:: An early version of PV_MagSqueeze
 related:: Classes/PV_Compander, Classes/PV_MagClip, Classes/PV_MagGate
 categories:: Libraries>JeffUGens, UGens>FFT
 related:: Guides/FFT-Overview
 
 Description::
-
-PV_MagSqueeze1 squeezes the magnitudes of all FFT bins to fit into the range [strong::low::, strong::high::]. 
-You may wish to apply link::Classes/PV_MagAbove:: first, to get rid of noisy bins.
+An earlier version of link::Classes/PV_MagSqueeze:: that doesn't use the strong::low::
+and strong::high:: parameters. 
 
 classmethods::
 
@@ -15,12 +14,6 @@ method::new
 
 argument::buffer
 The FFT buffer
-
-argument::low
-The low value of the target magnitude range
-
-argument::high
-The high value of the target magnitude range
 
 Examples::
 
@@ -30,7 +23,7 @@ code::
     sig = SoundIn.ar(0);
     chain = FFT(LocalBuf(2048), sig);
 	chain = PV_MagAbove(chain, 0.5);
-    chain = PV_MagSqueeze(chain, 0.5, 1.4);
+    chain = PV_MagSqueeze1(chain);
     sig = IFFT(chain);
     sig = Pan2.ar(sig);
     Out.ar(0, sig);
