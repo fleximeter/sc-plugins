@@ -47,6 +47,8 @@ struct PV_BinRandomMask : public Unit {
     int mNumBins;            // The number of FFT bins
 };
 
+struct PV_MagSqueeze : public Unit {};
+
 static void PV_CFreeze_next(PV_CFreeze *unit, int inNumSamples) {
     PV_GET_BUF
     float freezeState = IN0(1);
@@ -229,8 +231,39 @@ static void PV_BinRandomMask_Dtor(PV_BinRandomMask *unit) {
     }
 }
 
+static void PV_MagSqueeze_next(PV_MagSqueeze *unit, int inNumSamples) {
+    PV_GET_BUF
+    float low = IN0(1);
+    float high = IN0(2);
+    SCPolarBuf *p = ToPolarApx(buf);
+    float min = p->dc;
+    float max = p->dc;
+    if (p->nyq < min)
+        min = p->nyq;
+    if (p->nyq > max)
+        max = p->nyq;
+    for (int i = 0; i < numbins; i++) {
+        if (p->bin[i].mag < min)
+            min = p->bin[i].mag;
+        if (p->bin[i].mag > max)
+            max = p->bin[i].mag;
+    }
+    float range = max - min;
+    p->dc = (p->dc / max) * range + min;
+    p->nyq = (p->nyq / max) * range + min;
+    for (int i = 0; i < numbins; i++) {
+        p->bin[i].mag = (p->bin[i].mag / max) * range + min;
+    }
+}
+
+static void PV_MagSqueeze_Ctor(PV_MagSqueeze *unit) {
+    SETCALC(PV_MagSqueeze_next);
+    OUT0(0) = IN0(0);
+}
+
 PluginLoad(PV_Jeff) {
     ft = inTable;
+    DefineSimpleUnit(PV_MagSqueeze);
     DefineDtorUnit(PV_CFreeze);
     DefineDtorUnit(PV_BinRandomMask);
 }
