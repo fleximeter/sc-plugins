@@ -22,16 +22,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "SC_Constants.h"
 #include "SC_InterfaceTable.h"
 #include "FFT_UGens.h"
 #include "SC_Unit.h"
+#include <iostream>
 #include "rubberband/RubberBandLiveShifter.h"
+#include "ringbuffer.hpp"
 
 InterfaceTable *ft;
 
 struct RubberBandPS : public Unit {
-    RubberBand::RubberBandLiveShifter *shifter;
+    RubberBand::RubberBandLiveShifter* m_shifter;
+    RingBuffer<float>* m_sendBuffer;
+    RingBuffer<float>* m_receiveBuffer;
 };
 
 static void RubberBandPS_next(RubberBandPS *unit, int inNumSamples) {
@@ -39,16 +42,30 @@ static void RubberBandPS_next(RubberBandPS *unit, int inNumSamples) {
 }
 
 static void RubberBandPS_Ctor(RubberBandPS *unit) {
-    
-
+    float pitchRatio = IN0(1);
+    float formantRatio = IN0(2);
     // 0x01000000  // formant preserving
     // 0x00000000  // no formant preservation
-    // use sc malloc unit->shifter = RubberBand::RubberBandLiveShifter(SAMPLERATE, 1, 0x01000000);
+    unit->m_shifter = (RubberBand::RubberBandLiveShifter*)RTAlloc(unit->mWorld, sizeof(RubberBand::RubberBandLiveShifter));
+    new (unit->m_shifter) RubberBand::RubberBandLiveShifter(SAMPLERATE, 1, 0x01000000);
+    unit->m_sendBuffer = (RingBuffer<float>*)RTAlloc(unit->mWorld, sizeof(RingBuffer<float>));
+    new (unit->m_sendBuffer) RingBuffer<float>(BUFLENGTH, unit->m_shifter->getBlockSize(), 5);
+    unit->m_receiveBuffer = (RingBuffer<float>*)RTAlloc(unit->mWorld, sizeof(RingBuffer<float>));
+    new (unit->m_sendBuffer) RingBuffer<float>(unit->m_shifter->getBlockSize(), BUFLENGTH, 5);
     SETCALC(RubberBandPS_next);
+    unit->m_shifter->setPitchScale(pitchRatio);
+    std::cout << "RubberBand info:" << std::endl;
+    std::cout << "Pitch Scale: " << unit->m_shifter->getPitchScale() << std::endl;
+    std::cout << "Formant Scale: " << unit->m_shifter->getFormantScale() << std::endl;
+    std::cout << "Start Delay: " << unit->m_shifter->getStartDelay() << std::endl;
+    std::cout << "Channels: " << unit->m_shifter->getChannelCount() << std::endl;
+    std::cout << "Block Size: " << unit->m_shifter->getBlockSize() << std::endl;
 }
 
 static void RubberBandPS_Dtor(RubberBandPS *unit) {
-
+    RTFree(unit->mWorld, unit->m_shifter);
+    RTFree(unit->mWorld, unit->m_sendBuffer);
+    RTFree(unit->mWorld, unit->m_receiveBuffer);
 }
 
 PluginLoad(PV_Jeff) {

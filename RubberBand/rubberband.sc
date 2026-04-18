@@ -22,52 +22,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PV_CFreeze is a variant of PV_Freeze, but maintains several buffers of
-// input magnitudes in order to produce a less static frozen spectrum.
-PV_CFreeze : PV_ChainUGen {
-    *new {
-        arg buffer, freeze = 0.0, frameMemory = 4;
-        ^this.multiNew('control', buffer, freeze, frameMemory);
-    }
-}
-
-// PV_ZeroRandomBins randomly zeroes the magnitudes of spectral bins
-// given a probability. The same bins will be zeroed each time until
-// the trigger is set again.
-PV_BinRandomMask : PV_ChainUGen {
-    *new {
-        arg buffer, mask = 0.0, prob = 0.0, expCurve = -1.0, trigger = 0.0;
-        ^this.multiNew('control', buffer, mask, prob, expCurve, trigger);
-    }
-}
-
-// PV_MagMirror mirrors spectral magnitudes.
-PV_MagMirror : PV_ChainUGen {
-    *new {
-        arg buffer;
-        ^this.multiNew('control', buffer);
-    }
-}
-
-// PV_MagSqueeze squeezes the magnitudes of all spectral bins to fit into the range [low, high].
-PV_MagSqueeze : PV_ChainUGen {
-    *new {
-        arg buffer, low = 0.0, high = 1.0;
-        ^this.multiNew('control', buffer, low, high);
-    }
-}
-
-PV_MagSqueeze1 : PV_ChainUGen {
-    *new {
-        arg buffer;
-        ^this.multiNew('control', buffer);
-    }
-}
-
-// An equal power crossfade of the magnitudes of two FFT buffers
-PV_MagXFade : PV_ChainUGen {
-    *new {
-        arg buffer1, buffer2, fade=0.0;
-        ^this.multiNew('control', buffer1, buffer2, fade);
+// RubberBandPS is a phase vocoder based pitch shifter using the Rubber Band library.
+RubberBandPS : UGen {
+    *ar {
+        arg in, pitchRatio=1.0, formantRatio=1.0, mul=1.0, add=0.0;
+        ^this.multiNew('audio', in, pitchRatio, formantRatio).madd(mul, add);
     }
 }
