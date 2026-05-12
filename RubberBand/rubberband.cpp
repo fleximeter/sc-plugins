@@ -3,7 +3,7 @@ File: rubberband.cpp
 Author: Jeff Martin
 
 Description:
-
+A high quality, formant-preserving live pitch shifter using the RubberBand library.
 
 Copyright © 2026 by Jeffrey Martin. All rights reserved.
 Website: https://www.jeffreymartincomposer.com
@@ -25,7 +25,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "SC_InterfaceTable.h"
 #include "FFT_UGens.h"
 #include "SC_Unit.h"
-#include <iostream>
 #include "rubberband/RubberBandLiveShifter.h"
 #include "ringbuffer.hpp"
 
@@ -35,41 +34,104 @@ struct RubberBandPS : public Unit {
     RubberBand::RubberBandLiveShifter* m_shifter;
     RingBuffer<float>* m_sendBuffer;
     RingBuffer<float>* m_receiveBuffer;
+    float *m_shiftBufferIn;
+    float *m_shiftBufferOut;
+    float m_blockSize;
+    float m_shifterBlockSize;
 };
 
 static void RubberBandPS_next(RubberBandPS *unit, int inNumSamples) {
+    float pitchRatio = IN0(1);
+    float formantRatio = IN0(2);
+    float* in = IN(0);
+    float* out = OUT(0);
+
+    // Prepare the shifter, clipping the pitch and formant ratios for safety
+    unit->m_shifter->setPitchScale(sc_clip(pitchRatio, 1e-2, 64));
+    if (formantRatio) {
+        unit->m_shifter->setFormantScale(sc_clip(formantRatio, 1e-2, 64));
+    } else {
+        unit->m_shifter->setFormantScale(0.f);
+    }
+
+    // Feed the input into the shifter
+    unit->m_sendBuffer->writeBlock(in, inNumSamples);
+
+    if (unit->m_sendBuffer->isReadReady(unit->m_shifterBlockSize)) {
+        unit->m_sendBuffer->readBlock(unit->m_shiftBufferIn, unit->m_shifterBlockSize);
+        unit->m_shifter->shift(&(unit->m_shiftBufferIn), &(unit->m_shiftBufferOut));
+        unit->m_receiveBuffer->writeBlock(unit->m_shiftBufferOut, unit->m_shifterBlockSize);
+    }
     
+    // If there is a block of output samples ready, read it. (There should always be a block ready.)
+    if (unit->m_receiveBuffer->isReadReady(inNumSamples)) {
+        unit->m_receiveBuffer->readBlock(out, inNumSamples);
+    } else {
+        // Zero out the output buffer
+        for (size_t i = 0; i < inNumSamples; i++) {
+            out[i] = 0.f;
+        }
+    }
 }
 
 static void RubberBandPS_Ctor(RubberBandPS *unit) {
     float pitchRatio = IN0(1);
     float formantRatio = IN0(2);
+
+    // Initialize the shifter
     // 0x01000000  // formant preserving
     // 0x00000000  // no formant preservation
     unit->m_shifter = (RubberBand::RubberBandLiveShifter*)RTAlloc(unit->mWorld, sizeof(RubberBand::RubberBandLiveShifter));
     new (unit->m_shifter) RubberBand::RubberBandLiveShifter(SAMPLERATE, 1, 0x01000000);
-    unit->m_sendBuffer = (RingBuffer<float>*)RTAlloc(unit->mWorld, sizeof(RingBuffer<float>));
-    new (unit->m_sendBuffer) RingBuffer<float>(BUFLENGTH, unit->m_shifter->getBlockSize(), 5);
-    unit->m_receiveBuffer = (RingBuffer<float>*)RTAlloc(unit->mWorld, sizeof(RingBuffer<float>));
-    new (unit->m_sendBuffer) RingBuffer<float>(unit->m_shifter->getBlockSize(), BUFLENGTH, 5);
-    SETCALC(RubberBandPS_next);
     unit->m_shifter->setPitchScale(pitchRatio);
-    std::cout << "RubberBand info:" << std::endl;
-    std::cout << "Pitch Scale: " << unit->m_shifter->getPitchScale() << std::endl;
-    std::cout << "Formant Scale: " << unit->m_shifter->getFormantScale() << std::endl;
-    std::cout << "Start Delay: " << unit->m_shifter->getStartDelay() << std::endl;
-    std::cout << "Channels: " << unit->m_shifter->getChannelCount() << std::endl;
-    std::cout << "Block Size: " << unit->m_shifter->getBlockSize() << std::endl;
+    unit->m_blockSize = BUFLENGTH;
+    unit->m_shifterBlockSize = unit->m_shifter->getBlockSize();
+
+    // Buffers for holding the samples to feed in and out of the shifter.
+    // These buffers need to have the block size specified by the RubberBand shifter.
+    unit->m_shiftBufferIn = (float*)RTAlloc(unit->mWorld, unit->m_shifter->getBlockSize() * sizeof(float));
+    unit->m_shiftBufferOut = (float*)RTAlloc(unit->mWorld, unit->m_shifter->getBlockSize() * sizeof(float));
+
+    // Make the ring buffers
+    unit->m_sendBuffer = (RingBuffer<float>*)RTAlloc(unit->mWorld, sizeof(RingBuffer<float>));
+    new (unit->m_sendBuffer) RingBuffer<float>;
+    unit->m_sendBuffer->initialize(
+        (float*)RTAlloc(
+            unit->mWorld, 
+            (BUFLENGTH + unit->m_shifter->getBlockSize()) * 3 * sizeof(float)), 
+            (BUFLENGTH + unit->m_shifter->getBlockSize()) * 3
+        );
+    unit->m_receiveBuffer = (RingBuffer<float>*)RTAlloc(unit->mWorld, sizeof(RingBuffer<float>));
+    new (unit->m_receiveBuffer) RingBuffer<float>;
+    unit->m_receiveBuffer->initialize(
+        (float*)RTAlloc(
+            unit->mWorld,
+            (BUFLENGTH + unit->m_shifter->getBlockSize()) * 3 * sizeof(float)),
+            (BUFLENGTH + unit->m_shifter->getBlockSize()) * 3
+        );
+
+    // Initialize output ring buffer with zeros. If there's trouble, you might need to do this twice.
+    for (size_t i = 0; i < unit->m_shifter->getBlockSize(); i++) {
+        unit->m_shiftBufferIn[i] = 0.f;
+    }
+
+    // Initialize first out sample
+    OUT0(0) = 0;
+
+    SETCALC(RubberBandPS_next);
 }
 
 static void RubberBandPS_Dtor(RubberBandPS *unit) {
+    RTFree(unit->mWorld, unit->m_sendBuffer->m_buffer);
+    RTFree(unit->mWorld, unit->m_receiveBuffer->m_buffer);
     RTFree(unit->mWorld, unit->m_shifter);
     RTFree(unit->mWorld, unit->m_sendBuffer);
     RTFree(unit->mWorld, unit->m_receiveBuffer);
+    RTFree(unit->mWorld, unit->m_shiftBufferIn);
+    RTFree(unit->mWorld, unit->m_shiftBufferOut);
 }
 
 PluginLoad(PV_Jeff) {
     ft = inTable;
-    // DefineSimpleUnit(PV_MagMirror);
     DefineDtorUnit(RubberBandPS);
 }
