@@ -151,10 +151,10 @@ static void RubberBandStretcher_next(RubberBandStretcher *unit, int inNumSamples
     float timeRatio = IN0(1);
     float pitchRatio = IN0(2);
     float formantRatio = IN0(3);
-    int transientsMode = IN0(4);
-    int detector = IN0(5);
-    int phaseOption = IN0(6);
-    int pitchQuality = IN0(7);
+    int transientsMode = static_cast<int>(IN0(4));
+    int detector = static_cast<int>(IN0(5));
+    int phaseOption = static_cast<int>(IN0(6));
+    int pitchQuality = static_cast<int>(IN0(7));
 
     // Update shifter options only if something has changed
     if (timeRatio != unit->m_timeRatio) {
@@ -243,12 +243,12 @@ static void RubberBandStretcher_Ctor(RubberBandStretcher *unit) {
     float pitchRatio = IN0(2);
     float formantRatio = IN0(3);
     int transientsMode = IN0(4);
-    int detector = IN0(5);
-    int phaseOption = IN0(6);
-    int pitchQuality = IN0(7);
-    int windowOption = IN0(8);
-    int smoothing = IN0(9);
-    int engine = IN0(10);
+    int detector = static_cast<int>(IN0(5));
+    int phaseOption = static_cast<int>(IN0(6));
+    int pitchQuality = static_cast<int>(IN0(7));
+    int windowOption = static_cast<int>(IN0(8));
+    int smoothing = static_cast<int>(IN0(9));
+    int engine = static_cast<int>(IN0(10));
     
     unit->m_timeRatio = timeRatio;
     unit->m_pitchRatio = pitchRatio;
