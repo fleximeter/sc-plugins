@@ -136,12 +136,14 @@ install(FILES ${PROJECT}.sc
     DESTINATION ${EXTENSIONS_DIR}/Jeff/Classes
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ 
 )
-install(FILES RubberBandPS.schelp
+install(FILES RubberBandPS.schelp RubberBandStretcher.schelp
     DESTINATION ${EXTENSIONS_DIR}/Jeff/HelpSource/Classes
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ 
 )
 if(SUPERNOVA)
     add_library(${PROJECT}_supernova MODULE ${FILENAME})
+    target_link_libraries(${PROJECT}_supernova PRIVATE rubberband_lib)
+    set_target_properties(rubberband_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
     set_property(TARGET ${PROJECT}_supernova
                  PROPERTY COMPILE_DEFINITIONS SUPERNOVA)
     install(TARGETS ${PROJECT}_supernova
